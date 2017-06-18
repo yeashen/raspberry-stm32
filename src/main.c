@@ -16,13 +16,13 @@ int main(int argc, char *argv[])
 	
 	while(1)
 	{
-		led0_set(ON);
 		led1_set(ON);
+		led2_set(ON);
 		delay=500000;
 		while(delay)
 			delay--;
-		led0_set(OFF);
 		led1_set(OFF);
+		led2_set(OFF);
 		delay=500000;
 		while(delay)
 			delay--;

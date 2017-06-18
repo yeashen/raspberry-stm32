@@ -33,7 +33,7 @@ void led_init()
 	GPIO_Init(GPIOG, &GPIO_InitStructure);
 }
 
-void led0_set(unsigned char sw)
+void led1_set(unsigned char sw)
 {
 	if(sw == ON)
 		GPIO_SetBits(GPIOD, GPIO_Pin_13);
@@ -41,7 +41,7 @@ void led0_set(unsigned char sw)
 		GPIO_ResetBits(GPIOD, GPIO_Pin_13);
 }
 
-void led1_set(unsigned char sw)
+void led2_set(unsigned char sw)
 {
 	if(sw == ON)
 		GPIO_SetBits(GPIOG, GPIO_Pin_14);

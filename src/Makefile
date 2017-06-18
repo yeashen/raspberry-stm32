@@ -2,9 +2,31 @@
 
 include ../Makefile.common
 
-OBJS+=startup.o
-OBJS+=main.o
-OBJS+=led.o
+# system
+OBJS += startup.o
+OBJS += sys.o
+
+# main
+OBJS += main.o
+
+# peripheral
+OBJS += delay.o
+
+OBJS += led.o
+OBJS += adc.o
+OBJS += dac.o
+OBJS += DMA.o
+OBJS += exint.o
+#OBJS += gps.o
+OBJS += key.o
+OBJS += mpu6050.o
+OBJS += oled.o
+OBJS += pwm.o
+OBJS += spi.o
+OBJS += standby.o
+OBJS += sw_i2c.o
+OBJS += timer.o
+OBJS += usart.o
 
 all: src
 
