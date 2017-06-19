@@ -7,24 +7,20 @@
 *************************************************************************************/
 
 #include "led.h"
+#include "delay.h"
 
 int main(int argc, char *argv[])
 {
-	int delay;
-	
+	delay_init();
  	led_init();
 	
 	while(1)
 	{
 		led1_set(ON);
-		led2_set(ON);
-		delay=500000;
-		while(delay)
-			delay--;
-		led1_set(OFF);
 		led2_set(OFF);
-		delay=500000;
-		while(delay)
-			delay--;
+		delay_ms(500);
+		led1_set(OFF);
+		led2_set(ON);
+		delay_ms(500);
 	}
 }
