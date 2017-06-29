@@ -41,7 +41,10 @@ extern u16 USART2_RX_STA;         		//接收状态标记
 //如果想串口中断接收，请不要注释以下宏定义
 void uart1_init(u32 bound);
 void uart2_init(u32 bound);
+void uart3_init(u32 bound);
 void UART_Check_Event(void);
+int uart1_send(const u8 *buf, u32 len);
+int uart3_send(const u8 *buf, u32 len);
 #endif
 
 
