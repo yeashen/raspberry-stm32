@@ -20,32 +20,51 @@
 
 void led_init()
 {
+	/*
+	 * PA3 -> LED_R
+	 * PA5 -> LED_G
+	 * PB0 -> LED_B
+	 */
 	GPIO_InitTypeDef GPIO_InitStructure;
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA|RCC_APB2Periph_GPIOD|RCC_APB2Periph_GPIOG, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA|RCC_APB2Periph_GPIOB, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3|GPIO_Pin_5;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOD, &GPIO_InitStructure);
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
 	
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOG, &GPIO_InitStructure);
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	//GPIO_SetBits(GPIOA, GPIO_Pin_8);
+	//GPIO_ResetBits(GPIOA, GPIO_Pin_8);
 }
 
-void led1_set(unsigned char sw)
+void led_set(u8 rgb)
 {
-	if(sw == ON)
-		GPIO_SetBits(GPIOD, GPIO_Pin_13);
-	else
-		GPIO_ResetBits(GPIOD, GPIO_Pin_13);
+	switch(rgb){
+		case LED_RED:
+			GPIO_SetBits(GPIOA, GPIO_Pin_3);
+			GPIO_ResetBits(GPIOA, GPIO_Pin_5);
+			GPIO_ResetBits(GPIOB, GPIO_Pin_0);
+			break;
+		case LED_GREEN:
+			GPIO_SetBits(GPIOA, GPIO_Pin_5);
+			GPIO_ResetBits(GPIOA, GPIO_Pin_3);
+			GPIO_ResetBits(GPIOB, GPIO_Pin_0);
+			break;
+		case LED_BLUE:
+			GPIO_SetBits(GPIOB, GPIO_Pin_0);
+			GPIO_ResetBits(GPIOA, GPIO_Pin_3);
+			GPIO_ResetBits(GPIOA, GPIO_Pin_5);
+			break;
+	}
 }
 
-void led2_set(unsigned char sw)
-{
-	if(sw == ON)
-		GPIO_SetBits(GPIOG, GPIO_Pin_14);
-	else
-		GPIO_ResetBits(GPIOG, GPIO_Pin_14);
-}
 

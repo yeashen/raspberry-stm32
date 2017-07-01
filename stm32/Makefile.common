@@ -41,7 +41,7 @@ STMLIB=$(LIBDIR)/STM32_USB-FS-Device_Lib_V4.0.0/Libraries
 #STM32F103RET (512KB FLASH, 64KB RAM) --> STM32F10X_HD
 #STM32F103ZET (512KB FLASH, 64KB RAM) --> STM32F10X_HD
 #============================================================================#
-TypeOfMCU=STM32F10X_HD
+TypeOfMCU=STM32F10X_MD
 #============================================================================#
 
 TC=arm-none-eabi

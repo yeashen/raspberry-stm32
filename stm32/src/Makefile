@@ -22,6 +22,7 @@ OBJS += key.o
 OBJS += mpu6050.o
 OBJS += oled.o
 OBJS += pwm.o
+OBJS += motor.o
 OBJS += spi.o
 OBJS += standby.o
 OBJS += sw_i2c.o

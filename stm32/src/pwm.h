@@ -10,7 +10,7 @@
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_gpio.h"
 	 
-void TIMER1_PWM_init(u16 arr, u16 psc);
+void TIMER4_PWM_init(u16 arr, u16 psc);
 
 #ifdef __cplusplus
 }

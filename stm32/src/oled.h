@@ -15,14 +15,14 @@
 		    						  
 //-----------------OLED¶Ë¿Ú¶¨Òå----------------  					   
 
-#define OLED_CS_Clr()  GPIO_ResetBits(GPIOD,GPIO_Pin_6)
-#define OLED_CS_Set()  GPIO_SetBits(GPIOD,GPIO_Pin_6)
+#define OLED_CS_Clr()  GPIO_ResetBits(GPIOB,GPIO_Pin_1)
+#define OLED_CS_Set()  GPIO_SetBits(GPIOB,GPIO_Pin_1)
 
-#define OLED_RST_Clr() GPIO_ResetBits(GPIOG,GPIO_Pin_3)
-#define OLED_RST_Set() GPIO_SetBits(GPIOG,GPIO_Pin_3)
+#define OLED_RST_Clr() GPIO_ResetBits(GPIOB,GPIO_Pin_4)
+#define OLED_RST_Set() GPIO_SetBits(GPIOB,GPIO_Pin_4)
 //DC 
-#define OLED_RS_Clr() GPIO_ResetBits(GPIOG,GPIO_Pin_2)
-#define OLED_RS_Set() GPIO_SetBits(GPIOG,GPIO_Pin_2)
+#define OLED_RS_Clr() GPIO_ResetBits(GPIOB,GPIO_Pin_3)
+#define OLED_RS_Set() GPIO_SetBits(GPIOB,GPIO_Pin_3)
 
 #define OLED_WR_Clr() GPIO_ResetBits(GPIOG,GPIO_Pin_14)
 #define OLED_WR_Set() GPIO_SetBits(GPIOG,GPIO_Pin_14)

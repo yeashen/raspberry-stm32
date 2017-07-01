@@ -81,17 +81,17 @@ void sys_enter_standby(void)
 u8 chech_wakeup(void)
 {
 	u8 t = 0;	//记录按下的时间
-	LED2 = 1;
+	//LED2 = 1;
 	while(1){
 		if(WAKEUP){
 			t++;
 			delay_ms(30);
 			if(t >= 100){	//超过3s
-				LED2 = 1;
+				//LED2 = 1;
 				return 1;
 			}
 		}else{
-			LED2 = 0;
+			//LED2 = 0;
 			return 0;
 		}
 	}
