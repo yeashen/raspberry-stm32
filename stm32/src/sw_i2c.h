@@ -10,12 +10,12 @@
 #include "stm32f10x_rcc.h"
 #include "stm32f10x_gpio.h" 
  
-#define I2C_SCK    		PCout(12)
-#define I2C_SDA    		PCout(11)
-#define READ_SDA()   	PCin(11)
+#define I2C_SCK    		PBout(8)
+#define I2C_SDA    		PBout(9)
+#define READ_SDA()   	PBin(9)
 
-#define SDA_IN()	{GPIOC->CRH &= 0XFFFF0FFF; GPIOC->CRH |= 8<<12;}
-#define SDA_OUT()	{GPIOC->CRH &= 0XFFFF0FFF; GPIOC->CRH |= 3<<12;}
+#define SDA_IN()	{GPIOC->CRH &= 0XFFFFFF0F; GPIOC->CRH |= 8<<4;}
+#define SDA_OUT()	{GPIOC->CRH &= 0XFFFF0F0F; GPIOC->CRH |= 3<<4;}
 
 #define I2C_WR	0x00
 #define I2C_RD	0x01

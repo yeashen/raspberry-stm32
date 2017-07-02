@@ -9,11 +9,10 @@
 ******************************************************************************/
 
 #include "pwm.h"
-#include "led.h"
 
 /*-------------------------------------------------------------------
- * FUNC : TIMER1_PWM_init
- * DESC : timer1 pwm initial
+ * FUNC : TIMER4_PWM_init
+ * DESC : timer4 pwm initial
  * PARM : arr - reload value
  *		  psc - clock pre
  * RET	: N/A
@@ -24,8 +23,9 @@ void TIMER4_PWM_init(u16 arr, u16 psc)
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
 	TIM_OCInitTypeDef TIM_OCInitStructure;
 	
-	RCC_APB2PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
+	GPIO_PinRemapConfig(GPIO_Remap_TIM4, DISABLE);
 	
 	//PB 6.7
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6|GPIO_Pin_7;
@@ -42,11 +42,13 @@ void TIMER4_PWM_init(u16 arr, u16 psc)
 	TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
 	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
 	TIM_OCInitStructure.TIM_Pulse = 0;
-	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;//TIM_OCPolarity_High;
+	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
+	//TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
 	TIM_OC1Init(TIM4, &TIM_OCInitStructure);
 	TIM_OC2Init(TIM4, &TIM_OCInitStructure);
 	
-	TIM_CtrlPWMOutputs(TIM4, ENABLE);
+	/* advance timer setting */
+	//TIM_CtrlPWMOutputs(TIM4, ENABLE);
 	
 	TIM_OC1PreloadConfig(TIM4, TIM_OCPreload_Enable);
 	TIM_OC2PreloadConfig(TIM4, TIM_OCPreload_Enable);
@@ -55,3 +57,20 @@ void TIMER4_PWM_init(u16 arr, u16 psc)
 	TIM_Cmd(TIM4, ENABLE);
 }
 
+/*-------------------------------------------------------------------
+ * FUNC : TIMER3_PWM_Refresh
+ * DESC : timer1 pwm value refresh
+ * PARM : new_PWM_Value - new PWM value
+ * RET	: N/A
+ *-----------------------------------------------------------------*/
+Motor_PWM PWM_Value;
+
+void TIMER4_PWM_Refresh(Motor_PWM *new_PWM_Value)
+{
+	if(new_PWM_Value->pwm1 > PWM_MAX_VALUE) PWM_Value.pwm1 = PWM_MAX_VALUE;
+	if(new_PWM_Value->pwm2 > PWM_MAX_VALUE) PWM_Value.pwm2 = PWM_MAX_VALUE;
+	if(new_PWM_Value->pwm1 < 0)	PWM_Value.pwm1 = 0;
+	if(new_PWM_Value->pwm2 < 0)	PWM_Value.pwm2 = 0;
+	TIM_SetCompare1(TIM4, PWM_Value.pwm1);
+	TIM_SetCompare2(TIM4, PWM_Value.pwm2);
+}
