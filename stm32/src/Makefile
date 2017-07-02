@@ -28,6 +28,7 @@ OBJS += standby.o
 OBJS += sw_i2c.o
 OBJS += timer.o
 OBJS += usart.o
+OBJS += PID_Ctrl.o
 
 all: src
 
