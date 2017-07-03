@@ -8,6 +8,7 @@
 
 #include "serial.h"
 #include "port.h"
+#include "pkthandle.h"
 
 #define VERSION "0.1"
 
@@ -23,7 +24,7 @@ struct port_options port_opts = {
 
 void show_help(char *name) {
 	fprintf(stderr,
-		"Usage: %s [-bmh] [tty_device | i2c_device]\n"
+		"Usage: %s [-bmh] [tty_device]\n"
 		"	-b rate		Baud rate (default 115200)\n"
 		"	-m mode		Serial port mode (default 8e1)\n"
 		"	-h		Show this help\n"
@@ -83,14 +84,67 @@ int parse_options(int argc, char *argv[])
 	return 0;
 }
 
+/*
+  *  type: 0 --check packet checksum;		1 --generate packet checksum
+  */
+static int checksum_check(pkt_type_checksum type, uart_pkt_s *pkt)
+{
+	int i = 0;
+	unsigned int sum = 0, param_s = 0;
+
+	for(i = 0; i < (pkt->len); i++){
+		param_s += pkt->params[i];
+	}
+
+	sum = pkt->start + pkt->type + pkt->cmd + pkt->len + param_s;
+	sum &= 0xFFFF;
+
+	if(type == GEN_CHECKSUM){
+		pkt->checksum = sum;
+		return 0;
+	}else if(type == CHECK_CHECKSUM){
+		if(sum == pkt->checksum){
+			return 1;
+		}else{
+			//printk("c_sum: 0x%x r_sum: 0x%x\n", sum, pkt->checksum);
+			return -1;
+		}
+	}else{
+		return 2;
+	}
+}
+
+int packet_send(struct port_interface *port, uart_pkt_s *pkt)
+{
+	int ret = 0;
+	unsigned int len = pkt->len;
+
+	pkt->start = PACKET_START;
+
+	checksum_check(GEN_CHECKSUM, pkt);
+
+	pkt->params[len] = pkt->checksum & 0xFF;
+	pkt->params[len+1] = (pkt->checksum & 0xFF00)>>8;
+	
+	/* send packet */
+	ret = port->write(port, (unsigned char *)pkt, 6+len);
+	if (ret != PORT_ERR_OK) {
+		fprintf(stderr, "Failed to send message\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 int main(int argc, char* argv[])
 {
 	int ret = 0;
 	FILE *diag = stdout;
 	struct port_interface *port = NULL;
-	unsigned char tx_buf[256], rx_buf[256];
+	unsigned char rx_buf[256];
 	int i = 0;
 	int count = 10;
+	uart_pkt_s pkts;
 
 	fprintf(diag, "--------------------------------------------\n\n");
 	fprintf(diag, "rasp-stm32 " VERSION "\n\n");
@@ -111,28 +165,24 @@ int main(int argc, char* argv[])
 
 	fprintf(diag, "Interface %s: %s\n", port->name, port->get_cfg_str(port));
 
-	for(i = 0; i < 256; i++)
-		tx_buf[i] = i;
+	pkts.type = PKT_REQ_SET;
+	pkts.cmd = CMD_SET_SYS_STAT;
 
 	while(count--){
+		pkts.params[0] = count;
+		pkts.len = 1;
 		/* write */
-		ret = port->write(port, tx_buf, 7);
-		if (ret != PORT_ERR_OK) {
-			fprintf(stderr, "Failed to send message\n");
-			ret = -1;
-			goto close;
-		}
+		packet_send(port, &pkts);
 
 		/* read */
 		ret = port->read(port, rx_buf, 7);
 		if (ret != PORT_ERR_OK) {
-			fprintf(stderr, "Failed to receive message\n");
 			ret = -1;
 			goto close;
 		}
 
 		for(i = 0; i < 7; i++)
-			printf("%d ", rx_buf[i]);
+			printf("0x%x ", rx_buf[i]);
 		printf("\n");
 		usleep(1000000);
 	}
