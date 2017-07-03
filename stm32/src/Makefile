@@ -29,6 +29,7 @@ OBJS += sw_i2c.o
 OBJS += timer.o
 OBJS += usart.o
 OBJS += PID_Ctrl.o
+OBJS += pkthandle.o
 
 all: src
 

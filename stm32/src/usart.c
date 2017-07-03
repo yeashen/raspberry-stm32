@@ -1,5 +1,6 @@
 #include "sys.h"
-#include "usart.h"	  
+#include "usart.h"
+#include "pkthandle.h"	  
 ////////////////////////////////////////////////////////////////////////////////// 	 
 //如果使用ucos,则包括下面的头文件即可.
 #if SYSTEM_SUPPORT_UCOS
@@ -183,76 +184,122 @@ void uart2_init(u32 bound){
 
 }
 
+//初始化IO 串口3
+//bound:波特率
+void uart3_init(u32 bound){
+    //GPIO端口设置
+    GPIO_InitTypeDef GPIO_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+	 
+	RCC_APB2PeriphClockCmd(RCC_APB1Periph_USART3|RCC_APB2Periph_GPIOC, ENABLE);	//使能USART1，GPIOC时钟
+ 	USART_DeInit(USART3);  //复位串口2
+	 //USART3_TX   PC.10
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10; 
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;	//复用推挽输出
+    GPIO_Init(GPIOC, &GPIO_InitStructure); //初始化PC10
+   
+    //USART3_RX	  PC.11
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_11;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;//浮空输入
+    GPIO_Init(GPIOC, &GPIO_InitStructure);  //初始化PA10
+
+   //Usart3 NVIC 配置
+
+    NVIC_InitStructure.NVIC_IRQChannel = USART3_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority=3 ;//抢占优先级3
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;		//子优先级3
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;			//IRQ通道使能
+	NVIC_Init(&NVIC_InitStructure);	//根据指定的参数初始化VIC寄存器
+  
+   //USART 初始化设置
+
+	USART_InitStructure.USART_BaudRate = bound;//一般设置为9600;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;//字长为8位数据格式
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;//一个停止位
+	USART_InitStructure.USART_Parity = USART_Parity_No;//无奇偶校验位
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//无硬件数据流控制
+	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//收发模式
+
+    USART_Init(USART3, &USART_InitStructure); //初始化串口
+    USART_ITConfig(USART3, USART_IT_RXNE, ENABLE);//开启中断
+    USART_Cmd(USART3, ENABLE);                    //使能串口 
+
+}
+
 void UART_Check_Event(void)
 {
 	
 }
 
-u8 Rx_Buf[2][32];	//两个32字节的串口接收缓存
-static u8 Rx_Act=0;		//正在使用的buf号
-static u8 Rx_Adr=0;		//正在接收第几字节
-u8 Rx_Ok0 = 0;
-u8 Rx_Ok1 = 0;
+int uart1_send(const u8 *buf, u32 len)
+{
+	int i = 0;
+
+	for(i = 0; i < len; i++){
+		while((USART1->SR&0X40)==0);//循环发送,直到发送完毕   
+    	USART1->DR = (u8) buf[i];
+	}
+
+	return i;
+}
+
+int uart3_send(const u8 *buf, u32 len)
+{
+	int i = 0;
+
+	for(i = 0; i < len; i++){
+		USART_SendData(USART3, (uint8_t) buf[i]);
+		while (USART_GetFlagStatus(USART3, USART_FLAG_TC) == RESET) {}
+	}
+
+	return i;
+}
+
+static u8 recving = 0;
+static u8 count = 0;
+static u8 num = 0;
+static uart_pkt_s pkt;
 #if EN_USART1_RX   //如果使能了接收
 void USART1_IRQHandler(void)                	//串口1中断服务程序
-	{
-	u8 com_data;
+{
+	u8 dat;
 #ifdef OS_TICKS_PER_SEC	 	//如果时钟节拍数定义了,说明要使用ucosII了.
 	OSIntEnter();    
 #endif
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
-		{
+	{	
+		dat = USART_ReceiveData(USART1);//(USART1->DR);	//读取接收到的数据
 		
-		com_data = USART_ReceiveData(USART1);//(USART1->DR);	//读取接收到的数据
-		
-		if(Rx_Adr==0)		//寻找帧头0XAAAF
-		{
-			if(com_data==0xAA)	
-			{
-				Rx_Buf[Rx_Act][0] = com_data;
-				Rx_Adr = 1;
+		if((!recving) && (dat == PACKET_START)){
+			recving = 1;
+			count++;
+			pkt.start = dat;
+		}
+
+		if(recving == 1){
+			if(count == 1){/* type */
+     			pkt.type = dat;
+			}else if(count == 2){/* command */
+     			pkt.cmd = dat;
+			}else if(count == 3){/* len */
+     			pkt.len = dat;
+			}else if(count == (pkt.len+4)){/* checksum lsb 8bit*/
+     			pkt.checksum = dat;
+			}else if(count == (pkt.len+5)){/* checksum msb 8bit */
+     			pkt.checksum |= (dat<<8);
+				recving = 0;
+				count = 0;
+				num = 0;
+				packet_handle(&pkt);
+			}else{/* data*/
+				if(num < pkt.len){
+     				pkt.params[num++] = dat;
+				}
 			}
+			count++;
 		}
-		else if(Rx_Adr==1)
-		{
-			if(com_data==0xAF)	
-			{
-				Rx_Buf[Rx_Act][1] = com_data;
-				Rx_Adr = 2;
-			}
-			else
-				Rx_Adr = 0;
-		}
-		else if(Rx_Adr==2)		//FUN
-		{
-			Rx_Buf[Rx_Act][2] = com_data;
-			Rx_Adr = 3;
-		}
-		else if(Rx_Adr==3)		//LEN
-		{
-			Rx_Buf[Rx_Act][3] = com_data;
-			Rx_Adr = 4;
-		}
-		else
-		{
-			Rx_Buf[Rx_Act][Rx_Adr] = com_data;
-			Rx_Adr ++;
-		}
-		if(Rx_Adr==Rx_Buf[Rx_Act][3]+5)		//数据接收完毕
-		{
-			Rx_Adr = 0;
-			if(Rx_Act)	
-			{ 
-				Rx_Act = 0; 			//切换缓存
-				Rx_Ok1 = 1;
-			}
-			else 				
-			{
-				Rx_Act = 1;
-				Rx_Ok0 = 1;
-			}
-		}
-	 
      } 
 #ifdef OS_TICKS_PER_SEC	 	//如果时钟节拍数定义了,说明要使用ucosII了.
 	OSIntExit();  											 
