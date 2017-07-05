@@ -169,19 +169,22 @@ int main(int argc, char* argv[])
 	pkts.cmd = CMD_SET_SYS_STAT;
 
 	while(count--){
+		memset(rx_buf, 0, 256);
 		pkts.params[0] = count;
-		pkts.len = 1;
+		pkts.params[1] = count+1;
+		pkts.len = 2;
 		/* write */
 		packet_send(port, &pkts);
 
 		/* read */
-		ret = port->read(port, rx_buf, 7);
+		ret = port->read(port, rx_buf, (pkts.len+6));
 		if (ret != PORT_ERR_OK) {
+			printf("read failed, ret=%d\n", ret);
 			ret = -1;
 			goto close;
 		}
 
-		for(i = 0; i < 7; i++)
+		for(i = 0; i < (pkts.len+6); i++)
 			printf("0x%x ", rx_buf[i]);
 		printf("\n");
 		usleep(1000000);
