@@ -293,6 +293,7 @@ void USART1_IRQHandler(void)                	//串口1中断服务程序
 				count = 0;
 				num = 0;
 				packet_handle(&pkt);
+				return;
 			}else{/* data*/
 				if(num < pkt.len){
      				pkt.params[num++] = dat;

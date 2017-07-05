@@ -5,6 +5,7 @@ include ../Makefile.common
 # system
 OBJS += startup.o
 OBJS += sys.o
+OBJS += newlib_stubs.o
 
 # main
 OBJS += main.o
