@@ -37,6 +37,8 @@ clean:
 tshow:
 		@echo "######################################################################################################"
 		@echo "################# optimize settings: $(InfoTextLib), $(InfoTextSrc)"
+		@arm-none-eabi-size -d -B -t $(PROGRAM).elf
+		@echo "final size: `wc -c < $(PROGRAM).bin`"
 		@echo "######################################################################################################"
 
 flash:all

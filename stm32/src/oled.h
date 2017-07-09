@@ -36,11 +36,11 @@
 #define DATAOUT(x) GPIO_Write(GPIOC,x);//输出  
 //使用4线串行接口时使用 
 //D0 SCLK
-#define OLED_SCLK_Clr() GPIO_ResetBits(GPIOG,GPIO_Pin_5)
-#define OLED_SCLK_Set() GPIO_SetBits(GPIOG,GPIO_Pin_5)
+#define OLED_SCLK_Clr() GPIO_ResetBits(GPIOB,GPIO_Pin_5)
+#define OLED_SCLK_Set() GPIO_SetBits(GPIOB,GPIO_Pin_5)
 //D1 MOSI
-#define OLED_SDIN_Clr() GPIO_ResetBits(GPIOG,GPIO_Pin_4)
-#define OLED_SDIN_Set() GPIO_SetBits(GPIOG,GPIO_Pin_4)
+#define OLED_SDIN_Clr() GPIO_ResetBits(GPIOA,GPIO_Pin_15)
+#define OLED_SDIN_Set() GPIO_SetBits(GPIOA,GPIO_Pin_15)
 
  		     
 #define OLED_CMD  0	//写命令

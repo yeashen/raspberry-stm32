@@ -11,8 +11,15 @@ enum {
 	LED_BLUE,
 };
 
+enum {
+	LED_OFF = 0x0,
+	LED_ON,
+};
+
 void led_init(void);
 
-void led_set(u8 rgb);
+void led_rgb_set(u8 rgb);
+
+void led_set(u8 sw);
 
 #endif /* _LED_H */

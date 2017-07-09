@@ -1,103 +1,8 @@
 #include "sys.h"
 #include "usart.h"
-#include "pkthandle.h"	  
-////////////////////////////////////////////////////////////////////////////////// 	 
-//如果使用ucos,则包括下面的头文件即可.
-#if SYSTEM_SUPPORT_UCOS
-#include "includes.h"					//ucos 使用	  
-#endif
-//////////////////////////////////////////////////////////////////////////////////	 
-//本程序只供学习使用，未经作者许可，不得用于其它任何用途
-//ALIENTEK STM32开发板
-//串口1初始化		   
-//正点原子@ALIENTEK
-//技术论坛:www.openedv.com
-//修改日期:2012/8/18
-//版本：V1.5
-//版权所有，盗版必究。
-//Copyright(C) 广州市星翼电子科技有限公司 2009-2019
-//All rights reserved
-//********************************************************************************
-//V1.3修改说明 
-//支持适应不同频率下的串口波特率设置.
-//加入了对printf的支持
-//增加了串口接收命令功能.
-//修正了printf第一个字符丢失的bug
-//V1.4修改说明
-//1,修改串口初始化IO的bug
-//2,修改了USART_RX_STA,使得串口最大接收字节数为2的14次方
-//3,增加了USART_REC_LEN,用于定义串口最大允许接收的字节数(不大于2的14次方)
-//4,修改了EN_USART1_RX的使能方式
-//V1.5修改说明
-//1,增加了对UCOSII的支持
-////////////////////////////////////////////////////////////////////////////////// 	  
- 
+#include "pkthandle.h"
+#include <stdarg.h> 
 
-//////////////////////////////////////////////////////////////////
-//加入以下代码,支持printf函数,而不需要选择use MicroLIB	  
-#if 0
-#pragma import(__use_no_semihosting)             
-//标准库需要的支持函数                 
-struct __FILE 
-{ 
-	int handle; 
-
-}; 
-
-FILE __stdout;       
-//定义_sys_exit()以避免使用半主机模式    
-_sys_exit(int x) 
-{ 
-	x = x;
-} 
-//重定义fputc函数 
-int fputc(int ch, FILE *f)
-{      
-	while((USART1->SR&0X40)==0);//循环发送,直到发送完毕   
-    USART1->DR = (u8) ch;      
-	return ch;
-}
-#endif 
-
-/*使用microLib的方法*/
- /* 
-int fputc(int ch, FILE *f)
-{
-	USART_SendData(USART1, (uint8_t) ch);
-
-	while (USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET) {}	
-   
-    return ch;
-}
-int GetKey (void)  { 
-
-    while (!(USART1->SR & USART_FLAG_RXNE));
-
-    return ((int)(USART1->DR & 0x1FF));
-}
-*/
- 
-
-//串口1中断服务程序
-//注意,读取USARTx->SR能避免莫名其妙的错误   	
-u8 USART1_RX_BUF[USART1_REC_LEN];     //接收缓冲,最大USART_REC_LEN个字节.
-//接收状态
-//bit15，	接收完成标志
-//bit14，	接收到0x0d
-//bit13~0，	接收到的有效字节数目
-u16 USART1_RX_STA=0;       //接收状态标记	
-
-//串口2中断服务程序
-//注意,读取USARTx->SR能避免莫名其妙的错误   	
-u8 USART2_RX_BUF[USART2_REC_LEN];     //接收缓冲,最大USART_REC_LEN个字节.
-//接收状态
-//bit15，	接收完成标志
-//bit14，	接收到0x0d
-//bit13~0，	接收到的有效字节数目
-u16 USART2_RX_STA=0;       //接收状态标记
-
-//初始化IO 串口1 
-//bound:波特率
 void uart1_init(u32 bound){
     //GPIO端口设置
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -228,9 +133,179 @@ void uart3_init(u32 bound){
 
 }
 
-void UART_Check_Event(void)
+void printchar(char **str, unsigned int c)
 {
-	
+    while (USART_GetFlagStatus(DEBUG_UART, USART_FLAG_TXE) == RESET);
+    USART_SendData(DEBUG_UART, (uint8_t)c);
+}
+
+#define PAD_RIGHT 1
+#define PAD_ZERO 2
+
+static int prints(char **out, const char *string, int width, int pad)
+{
+    register int pc = 0, padchar = ' ';
+
+    if (width > 0) {
+        register int len = 0;
+        register const char *ptr;
+        for (ptr = string; *ptr; ++ptr) ++len;
+        if (len >= width) width = 0;
+        else width -= len;
+        if (pad & PAD_ZERO) padchar = '0';
+    }
+    if (!(pad & PAD_RIGHT)) {
+        for ( ; width > 0; --width) {
+            printchar (out, padchar);
+            ++pc;
+        }
+    }
+    for ( ; *string ; ++string) {
+        printchar (out, *string);
+        ++pc;
+    }
+    for ( ; width > 0; --width) {
+        printchar (out, padchar);
+        ++pc;
+    }
+
+    return pc;
+}
+
+/* the following should be enough for 32 bit int */
+#define PRINT_BUF_LEN 12
+
+static int printi(char **out, int i, int b, int sg, int width, int pad, int letbase)
+{
+    char print_buf[PRINT_BUF_LEN];
+    register char *s;
+    register int t, neg = 0, pc = 0;
+    register unsigned int u = i;
+
+    if (i == 0) {
+        print_buf[0] = '0';
+        print_buf[1] = '\0';
+        return prints (out, print_buf, width, pad);
+    }
+
+    if (sg && b == 10 && i < 0) {
+        neg = 1;
+        u = -i;
+    }
+
+    s = print_buf + PRINT_BUF_LEN-1;
+    *s = '\0';
+
+    while (u) {
+        t = u % b;
+        if( t >= 10 )
+            t += letbase - '0' - 10;
+        *--s = t + '0';
+        u /= b;
+    }
+
+    if (neg) {
+        if( width && (pad & PAD_ZERO) ) {
+            printchar (out, '-');
+            ++pc;
+            --width;
+        }
+        else {
+            *--s = '-';
+        }
+    }
+
+    return pc + prints (out, s, width, pad);
+}
+
+static int print( char **out, const char *format, va_list args )
+{
+    register int width, pad;
+    register int pc = 0;
+    char scr[2];
+
+    for (; *format != 0; ++format) {
+        if (*format == '%') {
+            ++format;
+            width = pad = 0;
+            if (*format == '\0') break;
+            if (*format == '%') goto out;
+            if (*format == '-') {
+                ++format;
+                pad = PAD_RIGHT;
+            }
+            while (*format == '0') {
+                ++format;
+                pad |= PAD_ZERO;
+            }
+            for ( ; *format >= '0' && *format <= '9'; ++format) {
+                width *= 10;
+                width += *format - '0';
+            }
+            if( *format == 's' ) {
+                register char *s = (char *)va_arg( args, int );
+                pc += prints (out, s?s:"(null)", width, pad);
+                continue;
+            }
+            if( *format == 'd' ) {
+                pc += printi (out, va_arg( args, int ), 10, 1, width, pad, 'a');
+                continue;
+            }
+            if( *format == 'x' ) {
+                pc += printi (out, va_arg( args, int ), 16, 0, width, pad, 'a');
+                continue;
+            }
+            if( *format == 'X' ) {
+                pc += printi (out, va_arg( args, int ), 16, 0, width, pad, 'A');
+                continue;
+            }
+            if( *format == 'u' ) {
+                pc += printi (out, va_arg( args, int ), 10, 0, width, pad, 'a');
+                continue;
+            }
+            if( *format == 'c' ) {
+                /* char are converted to int then pushed on the stack */
+                scr[0] = (char)va_arg( args, int );
+                scr[1] = '\0';
+                pc += prints (out, scr, width, pad);
+                continue;
+            }
+        }
+        else {
+            out:
+            printchar (out, *format);
+            ++pc;
+        }
+    }
+    if (out) **out = '\0';
+    va_end( args );
+    return pc;
+}
+
+int printf(const char *format, ...)
+{
+    va_list args;
+
+    va_start( args, format );
+    return print( 0, format, args );
+}
+
+int sprintf(char *out, const char *format, ...)
+{
+    va_list args;
+
+    va_start( args, format );
+    return print( &out, format, args );
+}
+
+int snprintf( char *buf, unsigned int count, const char *format, ... )
+{
+    va_list args;
+
+    ( void ) count;
+
+    va_start( args, format );
+    return print( &buf, format, args );
 }
 
 int uart1_send(const u8 *buf, u32 len)
@@ -261,13 +336,11 @@ static u8 recving = 0;
 static u8 count = 0;
 static u8 num = 0;
 static uart_pkt_s pkt;
-#if EN_USART1_RX   //如果使能了接收
+
 void USART1_IRQHandler(void)                	//串口1中断服务程序
 {
 	u8 dat;
-#ifdef OS_TICKS_PER_SEC	 	//如果时钟节拍数定义了,说明要使用ucosII了.
-	OSIntEnter();    
-#endif
+
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
 	{	
 		dat = USART_ReceiveData(USART1);//(USART1->DR);	//读取接收到的数据
@@ -301,50 +374,8 @@ void USART1_IRQHandler(void)                	//串口1中断服务程序
 			}
 			count++;
 		}
-     } 
-#ifdef OS_TICKS_PER_SEC	 	//如果时钟节拍数定义了,说明要使用ucosII了.
-	OSIntExit();  											 
-#endif
-} 
-#endif	
-
-#if EN_USART2_RX   //如果使能了接收
-void USART2_IRQHandler(void)                	//串口1中断服务程序
-	{
-	u8 Res;
-#ifdef OS_TICKS_PER_SEC	 	//如果时钟节拍数定义了,说明要使用ucosII了.
-	OSIntEnter();    
-#endif
-	if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //接收中断(接收到的数据必须是0x0d 0x0a结尾)
-		{
-		Res =USART_ReceiveData(USART2);//(USART2->DR);	//读取接收到的数据
 		
-		if((USART2_RX_STA&0x8000)==0)//接收未完成
-			{
-			if(USART2_RX_STA&0x4000)//接收到了0x0d
-				{
-				if(Res!=0x0a)
-					USART2_RX_STA=0;//接收错误,重新开始
-				else 
-					USART2_RX_STA|=0x8000;	//接收完成了 
-				}
-			else //还没收到0X0D
-				{	
-				if(Res==0x0d)
-					USART2_RX_STA|=0x4000;
-				else
-					{
-					USART2_RX_BUF[USART2_RX_STA&0X3FFF]=Res ;
-					USART2_RX_STA++;
-					if(USART2_RX_STA>(USART2_REC_LEN-1))
-						USART2_RX_STA=0;//接收数据错误,重新开始接收	  
-					}		 
-				}
-			}   		 
+		USART_ClearFlag(USART1, USART_FLAG_RXNE);
+        USART_ClearITPendingBit(USART1, USART_IT_RXNE);
      } 
-#ifdef OS_TICKS_PER_SEC	 	//如果时钟节拍数定义了,说明要使用ucosII了.
-	OSIntExit();  											 
-#endif
 } 
-#endif
-

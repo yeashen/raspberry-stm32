@@ -4,34 +4,42 @@
 #ifdef __cplusplus
  extern "C" {
 #endif
-
-#include "sys.h"	 
-#include "stm32f10x.h"
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h" 
+	 
+#include "stm32f10x.h" 
  
-#define I2C_SCK    		PBout(8)
-#define I2C_SDA    		PBout(9)
-#define READ_SDA()   	PBin(9)
+#define SCL_H         (GPIOB->BSRR = GPIO_Pin_8)
+#define SCL_L         (GPIOB->BRR  = GPIO_Pin_8) 
+                     
+#define SDA_H         (GPIOB->BSRR = GPIO_Pin_9)
+#define SDA_L         (GPIOB->BRR  = GPIO_Pin_9)
+                      
+#define SCL_read      (GPIOB->IDR  & GPIO_Pin_8)
+#define SDA_read      (GPIOB->IDR  & GPIO_Pin_9)
 
-#define SDA_IN()	{GPIOC->CRH &= 0XFFFFFF0F; GPIOC->CRH |= 8<<4;}
-#define SDA_OUT()	{GPIOC->CRH &= 0XFFFF0F0F; GPIOC->CRH |= 3<<4;}
+#define I2C_WR	((uint8_t)0x00)
+#define I2C_RD	((uint8_t)0x01)
 
-#define I2C_WR	0x00
-#define I2C_RD	0x01
+//#define I2C_PDEBUG
+#ifdef I2C_PDEBUG
+#define I2C_DEBUG(string,args...)	printf("[SWI2C_DEBUG] ");	\
+									printf(string, ##args)
+#else
+#define I2C_DEBUG(string,args...)
+#endif
 
-void sw_i2c_init(void);
-void sw_i2c_start(void);
+void SwI2C_init(void);
+bool sw_i2c_start(void);
 void sw_i2c_stop(void);
-u8 sw_i2c_wait_ack(void);
+bool sw_i2c_wait_ack(void);
 void sw_i2c_ack(void);
 void sw_i2c_noack(void);
 void sw_i2c_send_byte(u8 by);
-u8 sw_i2c_recv_byte(u8 ack);
+u8 sw_i2c_recv_byte(void);
 
-u8 sw_i2c_write_byte(u8 addr, u8 reg, u8 data);
-u8 sw_i2c_read_bytes(u8 addr, u8 reg, u8 len, u8 *buf);
-u8 sw_i2c_write_buffer(uint8_t addr, uint8_t reg, uint8_t len, uint8_t * data);
+bool SwI2C_WriteByte(u8 addr, u8 reg, u8 data);
+u8 SwI2C_ReadByte(u8 addr, u8 reg);
+bool SwI2C_ReadBytes(u8 addr, u8 reg, u8 len, u8 *buf);
+bool SwI2C_WriteBytes(uint8_t addr, uint8_t reg, uint8_t len, uint8_t * data);
 
 #ifdef __cplusplus
 }

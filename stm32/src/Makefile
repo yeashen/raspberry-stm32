@@ -14,23 +14,34 @@ OBJS += main.o
 OBJS += delay.o
 
 OBJS += led.o
-OBJS += adc.o
-OBJS += dac.o
-OBJS += DMA.o
-OBJS += exint.o
+#OBJS += adc.o
+#OBJS += dac.o
+#OBJS += DMA.o
+#OBJS += exint.o
 #OBJS += gps.o
-OBJS += key.o
-OBJS += mpu6050.o
+#OBJS += key.o
 OBJS += oled.o
 OBJS += pwm.o
 OBJS += motor.o
-OBJS += spi.o
-OBJS += standby.o
+#OBJS += spi.o
+#OBJS += standby.o
 OBJS += sw_i2c.o
+#OBJS += hw_i2c.o
 OBJS += timer.o
 OBJS += usart.o
 OBJS += PID_Ctrl.o
 OBJS += pkthandle.o
+OBJS += attitude.o
+
+# mpu6050
+ifeq ($(CONFIG_USE_MPU6050),1)
+OBJS += mpu6050.o
+ifeq ($(CONFIG_MPU6050_USE_DMP),1)
+OBJS += inv_mpu.o
+OBJS += inv_mpu_dmp_motion_driver.o
+OBJS += hmc5883l.o
+endif
+endif
 
 all: src
 
@@ -41,7 +52,7 @@ app.a: $(OBJS)
 .PHONY: src clean tshow
 
 clean:
-		rm -f app.a $(OBJS)
+		rm -f app.a *.o
 tshow:
 		@echo "######################################################################################################"
 		@echo "################# optimize settings: $(InfoTextLib), $(InfoTextSrc)"
