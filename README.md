@@ -28,11 +28,8 @@ GND | GND
 1. [download source files](https://sourceforge.net/projects/stm32flash/files/?source=navbar)
 2. extract and enter the directory, make and make install, installed at /usr/local/bin default, and you have to add /usr/local/bin to your system PATH
 3. input stm32flash to check if the stm32flash installation is successful.
-
-`$ stm32flash
-
-stm32flash 0.5
-
+    $ stm32flash
+    `stm32flash 0.5
 http://stm32flash.sourceforge.net/
 
 ERROR: Device not specified
@@ -44,11 +41,11 @@ Usage: stm32flash [-bvngfhc] [-[rw] filename] [tty_device | i2c_device]
 * raspberry Pi's uart configure
 
 the uart0 is used to communicate with Blueteeth modlule, so before use uart0 download stm32 program binary you must configure again at the first time.
-
 1. run raspi-config, disable terminal uart debug, edit /boot/cmdline.txt to make sure "consle=" is not serial0.
 2. modify /boot/config.txt, add follow:
-`dtoverlay=pi3-miniuart-bt
 
+`dtoverlay=pi3-miniuart-bt
 enable_uart=1`
+
 3. reboot, /dev/serial0 is the writed and read file, it is not same as the old raspberry Pi, not /dev/ttyAMA0
 
