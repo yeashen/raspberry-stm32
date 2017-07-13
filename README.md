@@ -29,9 +29,9 @@ GND | GND
 2. extract and enter the directory, make and make install, installed at /usr/local/bin default, and you have to add /usr/local/bin to your system PATH
 3. input stm32flash to check if the stm32flash installation is successful.
 
-    $ stm32flash
+`$ stm32flash
 
-    `stm32flash 0.5
+stm32flash 0.5
 
 http://stm32flash.sourceforge.net/
 
@@ -47,7 +47,6 @@ the uart0 is used to communicate with Blueteeth modlule, so before use uart0 dow
 
 1. run raspi-config, disable terminal uart debug, edit /boot/cmdline.txt to make sure "consle=" is not serial0.
 2. modify /boot/config.txt, add follow:
-
 `dtoverlay=pi3-miniuart-bt
 
 enable_uart=1`
