@@ -16,15 +16,14 @@
 #include "timer.h"
 #include "sw_i2c.h"
 #if USE_MPU6050
-#include "mpu6050.h"
 #if MPU6050_USE_DMP
 #include "inv_mpu.h"
 #include "inv_mpu_dmp_motion_driver.h"
 #include "hmc5883l.h"
+#else
+#include "mpu6050.h"
 #endif
 #endif
-
-#include <stdio.h>
 
 #if USE_MPU6050
 #if MPU6050_USE_DMP
@@ -41,13 +40,14 @@ int main(int argc, char *argv[])
 	int ret = 0;
 	//Motor_PWM PWM_Ctrl;
 	//int pwm = 500, dir = 0;
-	char buf[20];
-	int test = 12345;
+	//char buf[20];
+	//int test = 12345;
 
 	delay_init();
 	
 	uart1_init(115200);
-	printf("init uart1...\r\n");
+
+	uart2_init(115200);
 	
 	printf("init led...\r\n");
  	led_init();
@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
 #endif
 
 	printf("start timer1...\r\n");
-	TIM_Cmd(TIM1, ENABLE);
+	//TIM_Cmd(TIM1, ENABLE);
 	
 	printf("system init OK\r\n");
 

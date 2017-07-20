@@ -21,6 +21,8 @@
 #ifndef _INV_MPU_H_
 #define _INV_MPU_H_
 
+#include "stm32f10x.h"
+
 #define MPU6050
 //#define HMC5883
 #define MOTION_DRIVER_TARGET_STM32F103
@@ -67,6 +69,7 @@ void run_self_test(void);
  unsigned short inv_row_2_scale(const signed char *row);
 
 /* Set up APIs */
+bool mpu6050_check();
 int mpu_init(void);
 int mpu_init_slave(void);
 int mpu_set_bypass(unsigned char bypass_on);

@@ -12,28 +12,36 @@
 #include "led.h"
 #include "delay.h"
 #if USE_MPU6050
-#include "mpu6050.h"
 #if MPU6050_USE_DMP
 #include "hmc5883l.h"
 #include "inv_mpu.h"
 #include "inv_mpu_dmp_motion_driver.h"
+#else
+#include "mpu6050.h"
 #endif
 #endif
 #include "oled.h"
 #include "value_struct.h"
 #include "attitude.h"
 
-#include <stdio.h>
-
 static int task1_count = 0;
 static int task2_count = 0;
 static int led_sta = 0;
 
 #if USE_MPU6050
+#if defined(GET_XYZ)
 MPUData m_data;	//原始数据
 MPUData f_data;	//滤波后的数据
 Angle quat_angle;
 int16_t m_pitch, m_roll, m_yaw;
+#elif defined(GET_Z)
+int16_t acc_z;
+int16_t rot_z;
+float gyro_z;
+float angle_z;
+int16_t zero_acc = 0;
+int16_t zero_gyro = 0;
+#endif
 
 #define q30  1073741824.0f
 
@@ -97,13 +105,20 @@ void data_handle()
 		m_roll = quat_angle.roll * 100;
 		m_yaw = quat_angle.yaw * 10;
 	}
-#else 
+#else
+#if defined(GET_XYZ)
 	m_pitch = quat_angle.pitch * 100;
 	m_roll = quat_angle.roll * 100;
 	m_yaw = quat_angle.yaw * 10;
+#elif defined(GET_Z)
+	/* acc range 2g, rate 16384 LSB/g */
+	angle_z = (acc_z - zero_acc) / 16384;
+	angle_z = angle_z*1.2*180/3.14;
+	/* gyro rane 500deg/s reate 65.5 LSB/(deg/s) */
+	gyro_z = (rot_z - zero_gyro)/65.5;
+#endif
 #endif
 }
-
 
 void data_display()
 {
@@ -133,15 +148,20 @@ void TIM1_UP_IRQHandler(void)
 			#if MPU6050_USE_DMP
 			dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
 			#else
+			#if defined(GET_XYZ)
 			mpu6050_getMotion6(&m_data.m_accel.x, &m_data.m_accel.y, &m_data.m_accel.z, \
 				&m_data.m_gyro.x, &m_data.m_gyro.y, &m_data.m_gyro.z);
 			data_filter(&m_data, &f_data);
 			IMUupdate(&f_data, &quat_angle);
+			#elif defined(GET_Z)
+			acc_z =  mpu6050_getAccelerationZ();
+			rot_z =  mpu6050_getRotationZ();
+			#endif
 			#endif
 
 			data_handle();
 			
-			data_display();
+			//data_display();
 			#endif
 			
 			task1_count = 0;
@@ -155,7 +175,7 @@ void TIM1_UP_IRQHandler(void)
 				led_set(LED_OFF);
 				led_sta = 1;
 			}
-			printf("y=%d, r=%d, p=%d\r\n", m_yaw, m_roll, m_pitch);	
+			printf("acc=%d, rot=%d, angle=%d, gyro=%d\r\n", acc_z, rot_z, angle_z, gyro_z);	
 			task2_count = 0;
 		}
 		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);

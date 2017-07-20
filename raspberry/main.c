@@ -125,7 +125,7 @@ int packet_send(struct port_interface *port, uart_pkt_s *pkt)
 
 	pkt->params[len] = pkt->checksum & 0xFF;
 	pkt->params[len+1] = (pkt->checksum & 0xFF00)>>8;
-	
+
 	/* send packet */
 	ret = port->write(port, (unsigned char *)pkt, 6+len);
 	if (ret != PORT_ERR_OK) {
@@ -169,13 +169,12 @@ int main(int argc, char* argv[])
 	pkts.cmd = CMD_SET_SYS_STAT;
 
 	while(count--){
-		memset(rx_buf, 0, 256);
-		pkts.params[0] = count;
-		pkts.params[1] = count+1;
-		pkts.len = 2;
+		//memset(rx_buf, 0, 256);
+		pkts.params[0] = count%2;
+		pkts.len = 1;
 		/* write */
 		packet_send(port, &pkts);
-
+#if 1
 		/* read */
 		ret = port->read(port, rx_buf, (pkts.len+6));
 		if (ret != PORT_ERR_OK) {
@@ -187,6 +186,7 @@ int main(int argc, char* argv[])
 		for(i = 0; i < (pkts.len+6); i++)
 			printf("0x%x ", rx_buf[i]);
 		printf("\n");
+#endif
 		usleep(1000000);
 	}
 

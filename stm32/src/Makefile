@@ -35,11 +35,12 @@ OBJS += attitude.o
 
 # mpu6050
 ifeq ($(CONFIG_USE_MPU6050),1)
-OBJS += mpu6050.o
 ifeq ($(CONFIG_MPU6050_USE_DMP),1)
 OBJS += inv_mpu.o
 OBJS += inv_mpu_dmp_motion_driver.o
 OBJS += hmc5883l.o
+else
+OBJS += mpu6050.o
 endif
 endif
 

@@ -19,6 +19,13 @@
 #include "usart.h"
 #include "pkthandle.h" 
 #include "led.h"
+#include "motor.h"
+#include "pwm.h"
+
+/* global value define */
+static u8 left_dir = STOP;
+static u8 right_dir = STOP;
+static Motor_PWM pwm;
 
 /*
   *  type: 0 --check packet checksum;		1 --generate packet checksum
@@ -42,7 +49,7 @@ static int checksum_check(pkt_type_checksum type, uart_pkt_s *pkt)
 		if(sum == pkt->checksum){
 			return 1;
 		}else{
-			//printk("c_sum: 0x%x r_sum: 0x%x\n", sum, pkt->checksum);
+			PKG_DEBUG("c_sum: 0x%x r_sum: 0x%x\r\n", sum, pkt->checksum);
 			return -1;
 		}
 	}else{
@@ -60,7 +67,11 @@ void packet_send(uart_pkt_s *pkt)
 	pkt->params[len+1] = (pkt->checksum & 0xFF00)>>8;
 	
 	/* send packet */
+#if (DEBUG_UART == 1)
+	uart2_send((u8 *)pkt, 6+len);
+#elif (DEBUG_UART == 2)
 	uart1_send((u8 *)pkt, 6+len);
+#endif
 }
 
 int packet_handle(uart_pkt_s *pkt)
@@ -72,13 +83,13 @@ int packet_handle(uart_pkt_s *pkt)
 
 	if(NULL == pkt){
 		ret = -1;
-		//printk("packet is NULL\n");
+		PKG_DEBUG("packet is NULL\n");
 		return ret;
 	}
 
 	ret = checksum_check(CHECK_CHECKSUM, pkts);
 	if(ret < 0){
-		//printk("receive packet checksum error!");
+		PKG_DEBUG("receive packet checksum error!\r\n");
 		return ret;
 	}
 
@@ -90,9 +101,27 @@ int packet_handle(uart_pkt_s *pkt)
 		switch(reg){
 			case CMD_SET_SYS_STAT:		/*system status*/
 				led_set(param[0]);
+				PKG_DEBUG("CMD_SET_SYS_STAT : param[0]=0x%x\r\n", param[0]);
+				break;
+			case CMD_SET_MOTOR_DIR:		/* motor direction */
+				motor_direction_ctrl(param[0], param[1]);
+				if(param[0] == LEFT){
+					left_dir = param[1];
+				}else{
+					right_dir = param[1];
+				}
+				PKG_DEBUG("CMD_SET_MOTOR_DIR : param[0]=0x%x, param[1]=0x%x\r\n", 
+						param[0], param[1]);
+				break;
+			case CMD_SET_MOTOR_SPEED:	/* motor speed */
+				pwm.pwm1 = param[0];
+				pwm.pwm2 = param[1];
+				TIMER4_PWM_Refresh(&pwm);
+				PKG_DEBUG("CMD_SET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x\r\n",
+						param[0], param[1]);
 				break;
 			default:
-				//printk("invalid cmd!\n");
+				PKG_DEBUG("invalid cmd!\r\n");
 				break;
 		}
 		pkts->type = PKT_RSP_SET;
@@ -108,10 +137,24 @@ int packet_handle(uart_pkt_s *pkt)
 				pkts->params[5] = 0xbc;
 				pkts->params[6] = 0xde;
 				pkts->len = 7;
-
+				PKG_DEBUG("CMD_GET_SYS_INFO\r\n");
+				break;
+			case CMD_GET_MOTOR_DIR:		/* motor direction */
+				pkts->params[0] = left_dir;
+				pkts->params[1] = right_dir;
+				pkts->len = 2;
+				PKG_DEBUG("CMD_GET_MOTOR_DIR : param[0]=0x%x, param[1]=0x%x\r\n", 
+						param[0], param[1]);
+				break;
+			case CMD_GET_MOTOR_SPEED:	/* motor speed */
+				pkts->params[0] = pwm.pwm1;
+				pkts->params[1] = pwm.pwm2;
+				pkts->len = 2;
+				PKG_DEBUG("CMD_GET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x\r\n", 
+						param[0], param[1]);
 				break;
 			default:
-				//printk("invalid cmd!\n");
+				PKG_DEBUG("invalid cmd!\r\n");
 				break;
 		}
 		pkts->type = PKT_RSP_GET;
@@ -119,7 +162,7 @@ int packet_handle(uart_pkt_s *pkt)
 
 	packet_send(pkt);
 
-	//printk("start: 0x%x, type: 0x%x, cmd: 0x%x, len: 0x%x, checksum: 0x%x\n", pkt->start,
+	//PKG_DEBUG("start: 0x%x, type: 0x%x, cmd: 0x%x, len: 0x%x, checksum: 0x%x\r\n", pkt->start,
 	//	pkt->type, pkt->cmd, pkt->len, pkt->checksum);
 
 	return ret;

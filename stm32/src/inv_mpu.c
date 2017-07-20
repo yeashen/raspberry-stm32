@@ -17,8 +17,8 @@
  *                  MPU9150 (or MPU6050 w/ AK8975 on the auxiliary bus)
  *                  MPU9250 (or MPU6500 w/ AK8963 on the auxiliary bus)
  */
-#include <stdio.h>
-#include <stdint.h>
+//#include <stdio.h>
+//#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -198,10 +198,18 @@ static inline int reg_int_cb(struct int_param_s *int_param)
 
 // TODO: for STM32F103
 #elif defined MOTION_DRIVER_TARGET_STM32F103
+#if defined(SW_I2C)
 #include "sw_i2c.h"
-
 #define i2c_write   SwI2C_WriteBytes
 #define i2c_read    SwI2C_ReadBytes
+#elif defined(HW_I2C)
+#include "hw_i2c.h"
+#define i2c_write   HwI2C_WriteBytes
+#define i2c_read    HwI2C_ReadBytes
+#else
+#error Please select the I2C type - soft_i2c or hard_i2c
+#endif
+
 #define get_ms      get_ms
 #define log_i       printf
 #define log_e       printf
@@ -848,6 +856,24 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
     if (reg >= st.hw->num_reg)
         return -1;
     return !i2c_read(st.hw->addr, reg, 1, data);
+}
+
+/** Check MPU6050
+ * get ID and is or not WHO_AM_I 
+ */
+bool mpu6050_check()
+{
+    uint8_t id;
+    uint8_t data[2];
+
+    id = (i2c_read(st.hw->addr, 0x75, 1, data)) << 1;
+    if(id == 0x68){
+        log_e("Check OK, DEV_ID: 0x%x\r\n", id);
+        return TRUE;
+    }else{
+        log_e("Check NG! DEV_ID: 0x%x\r\n", id);
+        return FALSE;
+    }
 }
 
 /**

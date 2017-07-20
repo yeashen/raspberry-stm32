@@ -15,8 +15,8 @@
  *                  differentiate among MPL and general driver function calls.
  */
 //#include "stm32f10x.h"
-#include <stdio.h>
-#include <stdint.h>
+//#include <stdio.h>
+//#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -25,6 +25,7 @@
 #include "dmpKey.h"
 #include "dmpmap.h"
 #include "delay.h"
+#include "usart.h"
 
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
