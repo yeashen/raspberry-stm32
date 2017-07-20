@@ -56,6 +56,4 @@ typedef enum{
 #define PKG_DEBUG(string,args...)
 #endif
 
-int packet_handle(uart_pkt_s *pkt);
-
 #endif /* _PKTHANDLE_H */

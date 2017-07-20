@@ -136,15 +136,56 @@ int packet_send(struct port_interface *port, uart_pkt_s *pkt)
 	return 0;
 }
 
-int main(int argc, char* argv[])
+void show_menu(void)
+{
+	printf("\n========================================\n");
+	printf(" rasp-stm32 " VERSION "\n");
+	printf(" build @ %s %s\n", __DATE__,__TIME__);
+	printf(" https://github.com/yeashen/raspberry-stm32\n\n");
+	printf("========================================\n");
+	printf("0. set system status\n");
+	printf("1. get system information\n");
+	printf("2. set motor direction\n");
+	printf("3. get motor direction\n");
+	printf("4. set motor speed\n");
+	printf("5. get motor speed\n");
+	printf("q. Quit test\n");
+	printf("========================================\n");
+	printf("\033[32m Select: \033[m");
+}
+
+int packet_handle(struct port_interface *port, uart_pkt_s *pkt, int recv_len)
 {
 	int ret = 0;
+	int i;
+
+	unsigned char rx_buf[256];
+	/* write */
+	packet_send(port, pkt);
+
+	/* read */
+	ret = port->read(port, rx_buf, (recv_len+6));
+	if (ret != PORT_ERR_OK) {
+		printf("read failed, ret=%d\n", ret);
+		return ret;
+	}
+
+	for(i = 0; i < (recv_len+6); i++)
+		printf("0x%x ", rx_buf[i]);
+	printf("\n");
+
+	return ret;
+}
+
+int main(int argc, char *argv[])
+{
+	char input = 0;
+	int ret = 0;
+	int tmp;
 	FILE *diag = stdout;
 	struct port_interface *port = NULL;
-	unsigned char rx_buf[256];
-	int i = 0;
-	int count = 10;
 	uart_pkt_s pkts;
+	int recv_len = 0;
 
 	fprintf(diag, "--------------------------------------------\n\n");
 	fprintf(diag, "rasp-stm32 " VERSION "\n\n");
@@ -154,45 +195,96 @@ int main(int argc, char* argv[])
 
 	if (parse_options(argc, argv) != 0){
 		ret = -1;
-		goto close;
+		return ret;
 	}
 
 	if (port_open(&port_opts, &port) != PORT_ERR_OK) {
 		fprintf(stderr, "Failed to open port: %s\n", port_opts.device);
 		ret = -1;
-		goto close;
+		return ret;
 	}
 
 	fprintf(diag, "Interface %s: %s\n", port->name, port->get_cfg_str(port));
 
-	pkts.type = PKT_REQ_SET;
-	pkts.cmd = CMD_SET_SYS_STAT;
-
-	while(count--){
-		//memset(rx_buf, 0, 256);
-		pkts.params[0] = count%2;
-		pkts.len = 1;
-		/* write */
-		packet_send(port, &pkts);
-#if 1
-		/* read */
-		ret = port->read(port, rx_buf, (pkts.len+6));
-		if (ret != PORT_ERR_OK) {
-			printf("read failed, ret=%d\n", ret);
-			ret = -1;
-			goto close;
+	while(1)
+	{
+		show_menu();
+		input = getchar();
+		//getchar();
+		if((input == '0') || (input == '1') || (input == '2') || (input == '3') || 
+			(input == '4') || (input == '5') || (input == 'q'))
+		{
+			if (input == 'q')
+			{
+				port->close(port);
+				break;
+			}
+		
+			switch (input)
+			{
+				case '0':
+					printf("input status [0/1]: ");
+					scanf("%d", &tmp);
+					getchar();
+					pkts.type = PKT_REQ_SET;
+					pkts.cmd = CMD_SET_SYS_STAT;
+					pkts.params[0] = (tmp?1:0);
+					pkts.len = 1;
+					recv_len = pkts.len;
+					break;
+				case '1':
+					getchar();
+					pkts.type = PKT_REQ_GET;
+					pkts.cmd = CMD_GET_SYS_INFO;
+					pkts.len = 0;
+					recv_len = 7;
+					break;
+				case '2':
+					printf("input side [0/1]: ");
+					scanf("%d", &tmp);
+					getchar();
+					pkts.params[0] = (tmp?1:0);
+					printf("input dir [0/1/2/3]: ");
+					scanf("%d", &tmp);
+					getchar();
+					pkts.params[1] = tmp;
+					pkts.type = PKT_REQ_SET;
+					pkts.cmd = CMD_SET_MOTOR_DIR;
+					pkts.len = 2;
+					recv_len = pkts.len;
+					break;
+				case '3':
+					getchar();
+					pkts.type = PKT_REQ_GET;
+					pkts.cmd = CMD_GET_MOTOR_DIR;
+					pkts.len = 0;
+					recv_len = 2;
+					break;
+				case '4':
+					printf("input left pwm[0-999]: ");
+					scanf("%d", &tmp);
+					getchar();
+					pkts.params[0] = tmp;
+					printf("input right [0-999]: ");
+					scanf("%d", &tmp);
+					getchar();
+					pkts.params[1] = tmp;
+					pkts.type = PKT_REQ_SET;
+					pkts.cmd = CMD_SET_MOTOR_SPEED;
+					pkts.len = 2;
+					recv_len = pkts.len;
+					break;
+				case '5':
+					getchar();
+					pkts.type = PKT_REQ_GET;
+					pkts.cmd = CMD_GET_MOTOR_SPEED;
+					pkts.len = 0;
+					recv_len = 2;
+					break;
+			}
+			packet_handle(port, &pkts, recv_len);
 		}
-
-		for(i = 0; i < (pkts.len+6); i++)
-			printf("0x%x ", rx_buf[i]);
-		printf("\n");
-#endif
-		usleep(1000000);
 	}
-
-close:
-	if (port)
-		port->close(port);
 
 	return ret;
 }
