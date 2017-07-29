@@ -5,7 +5,6 @@
 * Program has to be compiled with optimizer setting "-O0".
 * Otherwise delay via while-loop will not work correctly.
 *************************************************************************************/
-
 #include "led.h"
 #include "delay.h"
 #include "motor.h"
@@ -25,6 +24,9 @@
 #endif
 #endif
 
+#include "encoder.h"
+#include "user_stdlib.h"
+
 #if USE_MPU6050
 #if MPU6050_USE_DMP
 static signed char gyro_orientation[9] = {-1, 0, 0,
@@ -35,13 +37,14 @@ int result;
 #endif
 #endif
 
+#define PWM_START	(630)
+
 int main(int argc, char *argv[])
 {
 	int ret = 0;
-	//Motor_PWM PWM_Ctrl;
-	//int pwm = 500, dir = 0;
-	//char buf[20];
-	//int test = 12345;
+	Motor_PWM PWM_Ctrl;
+	int pwm = PWM_START, dir = 0;
+	char buf[20];
 
 	delay_init();
 	
@@ -54,12 +57,10 @@ int main(int argc, char *argv[])
 	
 	printf("init oled...\r\n");
 	OLED_Init();
-	OLED_ShowString(10,0, (u8 *)"Rocker test");
- 	OLED_ShowString(0,16, (u8 *)"y:");  
-	OLED_ShowString(0,32, (u8 *)"r:");  
-	OLED_ShowString(0,48, (u8 *)"p:"); 
-	//sprintf(buf, "%d", test);
- 	//OLED_ShowString(20,16, (u8 *)buf);  
+	OLED_ShowString(10,0, (u8 *)"RaspberrySTM32");
+ 	OLED_ShowString(0,16, (u8 *)"Li Xiaoming");  
+	OLED_ShowString(0,32, (u8 *)"mail:");  
+	OLED_ShowString(0,48, (u8 *)"2017/07/29"); 
 	OLED_Refresh_Gram();
 
 	printf("config NVIC...\r\n");
@@ -67,6 +68,9 @@ int main(int argc, char *argv[])
 	
 	printf("init timer3 pwm...\r\n");
 	TIMER4_PWM_init(999, (uint16_t) (SystemCoreClock / 24000000) - 1);	//72MHz/(999+1)/(2+1)=24kHz
+	
+	printf("inti timer encoder...\r\n");
+	Encoder_Init();
 	
 	printf("init motor...\r\n");
 	motor_init();
@@ -84,7 +88,7 @@ int main(int argc, char *argv[])
 	HwI2C_Init();
 	#endif
 	delay_ms(100);
-	
+#if 0	
 	//MPU6050初始化
 	if(mpu6050_check() != TRUE){
 		printf("Check error! Please check!\r\n");
@@ -92,7 +96,7 @@ int main(int argc, char *argv[])
 	}else{
 		printf("Check OK.\r\n");
 	}
-
+#endif
 	#if MPU6050_USE_DMP
 	printf("init mpu6050...\r\n");
 	ret = mpu_init(); 
@@ -151,36 +155,39 @@ int main(int argc, char *argv[])
 #endif
 
 	printf("start timer1...\r\n");
-	//TIM_Cmd(TIM1, ENABLE);
+	TIM_Cmd(TIM1, ENABLE);
 	
 	printf("system init OK\r\n");
 
 	while(1)
 	{
-		#if 1 /* led */
-		led_rgb_set(LED_RED);
-		delay_ms(500);
-		led_rgb_set(LED_GREEN);
-		delay_ms(500);
-		led_rgb_set(LED_BLUE);
-		delay_ms(500);
-		#endif
-		
-		#if 0 /* motor */
+			
+		#if 1 /* motor */
 		if(dir){
-			pwm -= 50;
-			if(pwm < 500)
+			pwm -= 1;
+			if(pwm < PWM_START)
 				dir = 0;
 		}else{
-			pwm += 50;
+			pwm += 1;
 			if(pwm > PWM_MAX_VALUE)
 				dir = 1;
 		}
 		PWM_Ctrl.pwm1 = pwm;
 		PWM_Ctrl.pwm2 = pwm;
 		TIMER4_PWM_Refresh(&PWM_Ctrl);
-		delay_ms(500);
+		//printf("pwm=%d\r\n", pwm);
+		delay_ms(50);
 		#endif
+		
+		#if 0 /* led */
+		led_rgb_set(LED_RED);
+		delay_ms(100);
+		led_rgb_set(LED_GREEN);
+		delay_ms(100);
+		led_rgb_set(LED_BLUE);
+		delay_ms(100);
+		#endif
+
 		
 		#if 0 /* printf */
 		printf("hello stm32 for raspberry Pi\r\n");

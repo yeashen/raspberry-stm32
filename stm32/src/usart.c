@@ -37,10 +37,19 @@ void uart1_init(u32 bound){
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;//Ò»¸öÍ£Ö¹Î»
 	USART_InitStructure.USART_Parity = USART_Parity_No;//ÎÞÆæÅ¼Ð£ÑéÎ»
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//ÎÞÓ²¼þÊý¾ÝÁ÷¿ØÖÆ
+#if (DEBUG_UART == 2)
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//ÊÕ·¢Ä£Ê½
+#elif (DEBUG_UART == 1)
+	USART_InitStructure.USART_Mode = USART_Mode_Tx;	//ÊÕ·¢Ä£Ê½
+#endif
 
     USART_Init(USART1, &USART_InitStructure); //³õÊ¼»¯´®¿Ú
     USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);//¿ªÆôÖÐ¶Ï
+#if (DEBUG_UART == 2)
+    USART_ITConfig(USART1, USART_IT_RXNE, ENABLE);//¿ªÆôÖÐ¶Ï
+#elif (DEBUG_UART == 1)
+    USART_ITConfig(USART1, USART_IT_RXNE, DISABLE);//¿ªÆôÖÐ¶Ï
+#endif
     USART_Cmd(USART1, ENABLE);                    //Ê¹ÄÜ´®¿Ú 
 
 }
@@ -82,10 +91,19 @@ void uart2_init(u32 bound){
 	USART_InitStructure.USART_StopBits = USART_StopBits_1;//Ò»¸öÍ£Ö¹Î»
 	USART_InitStructure.USART_Parity = USART_Parity_No;//ÎÞÆæÅ¼Ð£ÑéÎ»
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;//ÎÞÓ²¼þÊý¾ÝÁ÷¿ØÖÆ
+#if (DEBUG_UART == 1)
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;	//ÊÕ·¢Ä£Ê½
+#elif (DEBUG_UART == 2)
+	USART_InitStructure.USART_Mode = USART_Mode_Tx;	//ÊÕ·¢Ä£Ê½
+#endif
 
     USART_Init(USART2, &USART_InitStructure); //³õÊ¼»¯´®¿Ú
     USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);//¿ªÆôÖÐ¶Ï
+#if (DEBUG_UART == 1)
+    USART_ITConfig(USART2, USART_IT_RXNE, ENABLE);//¿ªÆôÖÐ¶Ï
+#elif (DEBUG_UART == 2)
+    USART_ITConfig(USART1, USART_IT_RXNE, DISABLE);//¿ªÆôÖÐ¶Ï
+#endif
     USART_Cmd(USART2, ENABLE);                    //Ê¹ÄÜ´®¿Ú 
 
 }

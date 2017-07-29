@@ -526,6 +526,16 @@ typedef __I uint32_t vuc32;  /*!< Read Only */
 typedef __I uint16_t vuc16;  /*!< Read Only */
 typedef __I uint8_t vuc8;   /*!< Read Only */
 
+#define U8_MAX ((u8)255)
+#define S8_MAX ((s8)127)
+#define S8_MIN ((s8)-128)
+#define U16_MAX ((u16)65535u)
+#define S16_MAX ((s16)32767)
+#define S16_MIN ((s16)-32768)
+#define U32_MAX ((u32)4294967295uL)
+#define S32_MAX ((s32)2147483647)
+#define S32_MIN ((s32)-2147483648)
+
 #ifndef __cplusplus
 typedef enum {FALSE = 0, TRUE = !FALSE} bool;
 #endif

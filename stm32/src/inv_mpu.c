@@ -27,6 +27,9 @@
 //#include "stm32f10x.h"
 #include "delay.h"
 #include "usart.h"
+
+#define absx(x)			((x) > 0 ? (x) : -(x))
+
 int dmp_set_gyro_bias(long *bias) ;
 int dmp_set_accel_bias(long *bias);
 
@@ -66,7 +69,7 @@ void run_self_test(void)
         accel[1] *= accel_sens;
         accel[2] *= accel_sens;
         dmp_set_accel_bias(accel);
-		printf("setting bias succesfully ......\n");
+		printf("setting bias succesfully ......\r\n");
     }
 	else
 	{
@@ -1976,7 +1979,7 @@ int mpu_read_fifo_stream(unsigned short length, unsigned char *data,
             return -1;
         }
         if (tmp[0] & BIT_FIFO_OVERFLOW) {
-			log_e("tmp[0]=0x%x FIFO overflow!\r\n", tmp[0]);
+			//log_e("tmp[0]=0x%x FIFO overflow!\r\n", tmp[0]);
             mpu_reset_fifo();
             return -2;
         }
@@ -2111,7 +2114,8 @@ static int accel_self_test(long *bias_regular, long *bias_st)
 
     get_accel_prod_shift(st_shift);
     for(jj = 0; jj < 3; jj++) {
-        st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
+        //st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
+        st_shift_cust = absx(bias_regular[jj] - bias_st[jj]) / 65536.f;
         if (st_shift[jj]) {
             st_shift_var = st_shift_cust / st_shift[jj] - 1.f;
             if (fabs(st_shift_var) > test.max_accel_var)
@@ -2138,7 +2142,8 @@ static int gyro_self_test(long *bias_regular, long *bias_st)
     tmp[2] &= 0x1F;
 
     for (jj = 0; jj < 3; jj++) {
-        st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
+        //st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
+        st_shift_cust = absx(bias_regular[jj] - bias_st[jj]) / 65536.f;
         if (tmp[jj]) {
             st_shift = 3275.f / test.gyro_sens;
             while (--tmp[jj])
@@ -2213,6 +2218,7 @@ static int get_st_biases(long *gyro, long *accel, unsigned char hw_test)
     unsigned char data[MAX_PACKET_LENGTH];
     unsigned char packet_count, ii;
     unsigned short fifo_count;
+	unsigned char has_accel = 1;
 
     data[0] = 0x01;
     data[1] = 0;

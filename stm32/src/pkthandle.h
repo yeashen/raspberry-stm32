@@ -42,7 +42,9 @@ typedef enum{
 /* get motor direction, no param */
 #define CMD_GET_MOTOR_DIR		0x03
 
-/* set motor speed, param[0]: left/right, param[1]: speed */
+/* set motor speed, param[0]: pwm0 lsb, param[1]: pwm0 msb
+ * param[2]: pwm1 lsb, param[3]: pwm1 msb
+ * */
 #define CMD_SET_MOTOR_SPEED		0x04
 
 /* get motor speed, no param */

@@ -114,11 +114,11 @@ int packet_handle(uart_pkt_s *pkt)
 						param[0], param[1]);
 				break;
 			case CMD_SET_MOTOR_SPEED:	/* motor speed */
-				pwm.pwm1 = param[0];
-				pwm.pwm2 = param[1];
+				pwm.pwm1 = param[0]|(param[1]<<8);
+				pwm.pwm2 = param[2]|(param[3]<<8);
 				TIMER4_PWM_Refresh(&pwm);
-				PKG_DEBUG("CMD_SET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x\r\n",
-						param[0], param[1]);
+				PKG_DEBUG("CMD_SET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x, param[2]=0x%x, param[3]=0x%x\r\n",
+						param[0], param[1], param[2], param[3]);
 				break;
 			default:
 				PKG_DEBUG("invalid cmd!\r\n");
@@ -147,11 +147,13 @@ int packet_handle(uart_pkt_s *pkt)
 						param[0], param[1]);
 				break;
 			case CMD_GET_MOTOR_SPEED:	/* motor speed */
-				pkts->params[0] = pwm.pwm1;
-				pkts->params[1] = pwm.pwm2;
-				pkts->len = 2;
-				PKG_DEBUG("CMD_GET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x\r\n", 
-						param[0], param[1]);
+				pkts->params[0] = pwm.pwm1&0xFF;
+				pkts->params[1] = (pwm.pwm1&0xFF00)>>8;
+				pkts->params[2] = pwm.pwm2&0xFF;
+				pkts->params[3] = (pwm.pwm2&0xFF00)>>8;
+				pkts->len = 4;
+				PKG_DEBUG("CMD_GET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x, param[2]=0x%x, param[3]=0x%x\r\n",
+						param[0], param[1], param[2], param[3]);
 				break;
 			default:
 				PKG_DEBUG("invalid cmd!\r\n");

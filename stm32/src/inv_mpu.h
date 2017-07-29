@@ -27,6 +27,8 @@
 //#define HMC5883
 #define MOTION_DRIVER_TARGET_STM32F103
 
+#define EMPL_NO_64BIT
+
 #define DEFAULT_MPU_HZ  (100)
 #define INV_X_GYRO      (0x40)
 #define INV_Y_GYRO      (0x20)

@@ -17,7 +17,7 @@
 //#include "stm32f10x.h"
 //#include <stdio.h>
 //#include <stdint.h>
-#include <stdlib.h>
+//#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "inv_mpu.h"
@@ -1276,7 +1276,7 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
 
     /* Get a packet. */
     if (mpu_read_fifo_stream(dmp.packet_length, fifo_data, more)){
-		printf("mpu_read_fifo_stream fail!\r\n");
+		//printf("mpu_read_fifo_stream fail!\r\n");
         return -1;
     }
 

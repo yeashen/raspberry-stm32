@@ -30,16 +30,16 @@ src:
 	$(MAKE) -C src $@
 clean:
 	$(MAKE) -C src $@
-	$(MAKE) -C libs $@
+	#$(MAKE) -C libs $@
 	rm -f $(PROGRAM).elf $(PROGRAM).hex $(PROGRAM).bin $(PROGRAM).info_elf $(PROGRAM).info_size
 	rm -f $(PROGRAM).info_code
 	rm -f $(PROGRAM).info_symbol
 tshow:
-		@echo "######################################################################################################"
-		@echo "################# optimize settings: $(InfoTextLib), $(InfoTextSrc)"
-		@arm-none-eabi-size -d -B -t $(PROGRAM).elf
-		@echo "final size: `wc -c < $(PROGRAM).bin`"
-		@echo "######################################################################################################"
+	@echo "######################################################################################################"
+	@echo "################# optimize settings: $(InfoTextLib), $(InfoTextSrc)"
+	@arm-none-eabi-size -d -B -t $(PROGRAM).elf
+	@echo "final size: `wc -c < $(PROGRAM).bin`"
+	@echo "######################################################################################################"
 
 flash:all
 	./do_flash.pl $(TOP)/main.bin  

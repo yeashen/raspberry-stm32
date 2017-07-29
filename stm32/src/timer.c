@@ -23,10 +23,15 @@
 #include "oled.h"
 #include "value_struct.h"
 #include "attitude.h"
+#include "user_stdlib.h"
+#include "usart.h"
+#include "encoder.h"
 
 static int task1_count = 0;
 static int task2_count = 0;
+static int task3_count = 0;
 static int led_sta = 0;
+
 
 #if USE_MPU6050
 #if defined(GET_XYZ)
@@ -52,6 +57,8 @@ unsigned long sensor_timestamp;
 short sensors;
 unsigned char more;
 long quat[4];
+#else
+static int16_t mpu_temp = 0;
 #endif
 #endif
 
@@ -98,12 +105,12 @@ void data_handle()
 		q1 = quat[1] / q30;
 		q2 = quat[2] / q30;
 		q3 = quat[3] / q30;
-		quat_angle.pitch = asin(2 * q1 * q3 - 2 * q0* q2)* 57.3; // pitch
+		//quat_angle.pitch = asin(2 * q1 * q3 - 2 * q0* q2)* 57.3; // pitch
 		quat_angle.roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3; // roll
-		quat_angle.yaw = atan2(2*(q1*q2 + q0*q3),q0*q0+q1*q1-q2*q2-q3*q3) * 57.3;	//yaw
-		m_pitch = quat_angle.pitch * 100;
-		m_roll = quat_angle.roll * 100;
-		m_yaw = quat_angle.yaw * 10;
+		//quat_angle.yaw = atan2(2*(q1*q2 + q0*q3),q0*q0+q1*q1-q2*q2-q3*q3) * 57.3;	//yaw
+		//m_pitch = quat_angle.pitch * 100;
+		m_roll = quat_angle.roll;
+		//m_yaw = quat_angle.yaw * 10;
 	}
 #else
 #if defined(GET_XYZ)
@@ -122,48 +129,51 @@ void data_handle()
 
 void data_display()
 {
-#if 0
 	char buf[128];
 
-	sprintf(buf, "%d", m_yaw);
-	OLED_ShowString(20,16, (u8 *)buf); 
-	sprintf(buf, "%d", m_roll);	
-	OLED_ShowString(20,32, (u8 *)buf);  
-	sprintf(buf, "%d", m_pitch);
-	OLED_ShowString(20,48, (u8 *)buf); 
+	OLED_Clear();
+
+	OLED_ShowString(0, 0, (u8 *)"a:");
+	
+	itoa(m_roll, buf, 10);
+	OLED_ShowString(24, 0, (u8 *)buf);  
 	OLED_Refresh_Gram();
-#endif
 }
 #endif
 
 void TIM1_UP_IRQHandler(void)
 {
+	int ret = 0;
 	task1_count++;
 	task2_count++;
+	task3_count++;
 	if(TIM_GetITStatus(TIM1, TIM_IT_Update) != RESET){
 		
 		//10ms 定时任务
 		if(task1_count == 10){	
-			#if USE_MPU6050
-			#if MPU6050_USE_DMP
-			dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
-			#else
-			#if defined(GET_XYZ)
+#if USE_MPU6050
+	#if MPU6050_USE_DMP
+			ret = dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
+			if(ret < 0)
+				goto retry;
+	#else
+		#if defined(GET_XYZ)
 			mpu6050_getMotion6(&m_data.m_accel.x, &m_data.m_accel.y, &m_data.m_accel.z, \
 				&m_data.m_gyro.x, &m_data.m_gyro.y, &m_data.m_gyro.z);
 			data_filter(&m_data, &f_data);
 			IMUupdate(&f_data, &quat_angle);
-			#elif defined(GET_Z)
+		#elif defined(GET_Z)
 			acc_z =  mpu6050_getAccelerationZ();
 			rot_z =  mpu6050_getRotationZ();
-			#endif
-			#endif
+		#endif
+			mpu_temp = mpu6050_getTemperature();
+	#endif
 
 			data_handle();
 			
 			//data_display();
-			#endif
-			
+#endif
+retry:	
 			task1_count = 0;
 		}
 		//100ms 定时任务
@@ -175,8 +185,20 @@ void TIM1_UP_IRQHandler(void)
 				led_set(LED_OFF);
 				led_sta = 1;
 			}
-			printf("acc=%d, rot=%d, angle=%d, gyro=%d\r\n", acc_z, rot_z, angle_z, gyro_z);	
+#if USE_MPU6050
+#if defined(GET_Z)
+			//printf("acc=%d, rot=%d, angle=%d, gyro=%d temp=%d\r\n", acc_z, rot_z, angle_z, gyro_z, mpu_temp);	
+#elif defined(GET_XYZ)
+			printf("angle=%d\r\n", m_roll);
+#endif
+			data_display();
+#endif
 			task2_count = 0;
+		}
+		//1s task
+		if(task3_count == 1000){
+			Printf_encoder(Printf_TIMCNT);
+			task3_count = 0;
 		}
 		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
 	}

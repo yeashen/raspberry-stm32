@@ -63,14 +63,16 @@ void TIMER4_PWM_init(u16 arr, u16 psc)
  * PARM : new_PWM_Value - new PWM value
  * RET	: N/A
  *-----------------------------------------------------------------*/
-Motor_PWM PWM_Value;
-
 void TIMER4_PWM_Refresh(Motor_PWM *new_PWM_Value)
 {
+	Motor_PWM PWM_Value;
+	PWM_Value.pwm1 = new_PWM_Value->pwm1;
+	PWM_Value.pwm2 = new_PWM_Value->pwm2;
 	if(new_PWM_Value->pwm1 > PWM_MAX_VALUE) PWM_Value.pwm1 = PWM_MAX_VALUE;
 	if(new_PWM_Value->pwm2 > PWM_MAX_VALUE) PWM_Value.pwm2 = PWM_MAX_VALUE;
 	if(new_PWM_Value->pwm1 < 0)	PWM_Value.pwm1 = 0;
 	if(new_PWM_Value->pwm2 < 0)	PWM_Value.pwm2 = 0;
+
 	TIM_SetCompare1(TIM4, PWM_Value.pwm1);
 	TIM_SetCompare2(TIM4, PWM_Value.pwm2);
 }
