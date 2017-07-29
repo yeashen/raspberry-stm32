@@ -264,14 +264,16 @@ int main(int argc, char *argv[])
 					printf("input left pwm[0-999]: ");
 					scanf("%d", &tmp);
 					getchar();
-					pkts.params[0] = tmp;
+					pkts.params[0] = tmp&0xFF;
+					pkts.params[1] = (tmp&0xFF00)>>8;
 					printf("input right [0-999]: ");
 					scanf("%d", &tmp);
 					getchar();
-					pkts.params[1] = tmp;
+					pkts.params[2] = tmp&0xFF;
+					pkts.params[3] = (tmp&0xFF00)>>8;
 					pkts.type = PKT_REQ_SET;
 					pkts.cmd = CMD_SET_MOTOR_SPEED;
-					pkts.len = 2;
+					pkts.len = 4;
 					recv_len = pkts.len;
 					break;
 				case '5':
@@ -279,7 +281,7 @@ int main(int argc, char *argv[])
 					pkts.type = PKT_REQ_GET;
 					pkts.cmd = CMD_GET_MOTOR_SPEED;
 					pkts.len = 0;
-					recv_len = 2;
+					recv_len = 4;
 					break;
 			}
 			packet_handle(port, &pkts, recv_len);
