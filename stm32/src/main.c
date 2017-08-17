@@ -27,6 +27,9 @@
 #include "encoder.h"
 #include "user_stdlib.h"
 
+#include "hw_config.h"
+#include "usb_lib.h"
+
 #if USE_MPU6050
 #if MPU6050_USE_DMP
 static signed char gyro_orientation[9] = {-1, 0, 0,
@@ -39,6 +42,7 @@ int result;
 
 #define PWM_START	(630)
 
+#if 0
 int main(int argc, char *argv[])
 {
 	int ret = 0;
@@ -197,3 +201,41 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+#endif
+
+#if 1
+extern u8 EP2BUSY;
+int main(int argc, char *argv[])
+{
+	delay_init();
+	
+	uart1_init(115200);
+	
+	NVIC_Configuration();
+	
+	printf("usb hardward init...\r\n");
+
+	printf("interrupt config\r\n");
+	USB_Interrupts_Config();    
+
+	printf("usb clk config\r\n");
+	Set_USBClock();  
+
+	printf("usb init\r\n");
+	USB_Init();
+
+	delay_ms(1000);
+
+	printf("system initial OK.\r\n");
+	
+	while(1)
+	{
+		if(EP2BUSY==0)
+		{
+			EP2BUSY = 1;
+			Joystick_Send(1,1);
+			delay_ms(1000);
+		}
+	}
+}
+#endif

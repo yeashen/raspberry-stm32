@@ -20,6 +20,7 @@ OBJS += led.o
 #OBJS += exint.o
 #OBJS += gps.o
 #OBJS += key.o
+
 OBJS += oled.o
 OBJS += pwm.o
 OBJS += motor.o
@@ -46,6 +47,11 @@ OBJS += mpu6050.o
 endif
 endif
 
+ifeq ($(CONFIG_USE_USB),1)
+OBJS += $(patsubst %.c,%.o,$(wildcard usb/lib/*.c))
+OBJS += $(patsubst %.c,%.o,$(wildcard usb/config/*.c))
+endif
+
 all: src
 
 src: app.a
@@ -55,7 +61,8 @@ app.a: $(OBJS)
 .PHONY: src clean tshow
 
 clean:
-		rm -f app.a *.o
+		rm -f app.a *.o 
+		rm -f usb/lib/*.o usb/config/*.o
 tshow:
 		@echo "######################################################################################################"
 		@echo "################# optimize settings: $(InfoTextLib), $(InfoTextSrc)"

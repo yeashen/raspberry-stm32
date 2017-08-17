@@ -41,7 +41,7 @@ STMLIB=$(LIBDIR)/STM32_USB-FS-Device_Lib_V4.0.0/Libraries
 #STM32F103RET (512KB FLASH, 64KB RAM) --> STM32F10X_HD
 #STM32F103ZET (512KB FLASH, 64KB RAM) --> STM32F10X_HD
 #============================================================================#
-TypeOfMCU=STM32F10X_MD
+TypeOfMCU=STM32F10X_HD
 #============================================================================#
 
 TC=arm-none-eabi
@@ -55,7 +55,11 @@ INCLUDE+=-I$(STMLIB)/CMSIS/Include
 INCLUDE+=-I$(STMLIB)/CMSIS/Device/ST/STM32F10x/Include
 INCLUDE+=-I$(STMLIB)/CMSIS/Device/ST/STM32F10x/Source/Templates
 INCLUDE+=-I$(STMLIB)/STM32F10x_StdPeriph_Driver/inc
-INCLUDE+=-I$(STMLIB)/STM32_USB-FS-Device_Driver/inc
+#INCLUDE+=-I$(STMLIB)/STM32_USB-FS-Device_Driver/inc
+INCLUDE+=-I$(TOP)/src
+# for USB
+INCLUDE+=-I$(TOP)/src/usb/lib
+INCLUDE+=-I$(TOP)/src/usb/config
 COMMONFLAGS=-g -mcpu=cortex-m3 -mthumb
 COMMONFLAGSlib=$(COMMONFLAGS)
 #Commands for general Makefile and src Makefile
@@ -102,13 +106,14 @@ CFLAGSlib+=-D $(TypeOfMCU)
 CFLAGSlib+=-D VECT_TAB_FLASH
 
 #################User Add###########################
-CONFIG_DEBUG_USART=2
+CONFIG_DEBUG_USART=1
 # i2c : soft / hard
 CONFIG_I2C_TYPE=soft
 CONFIG_USE_MPU6050=0
 CONFIG_MPU6050_USE_DMP=1
 # mpu6050 get type: xyz / z
 CONFIG_MPU6050_GET_TYPE=xyz
+CONFIG_USE_USB=1
 
 CFLAGS += -D USE_MPU6050=$(CONFIG_USE_MPU6050)
 CFLAGS += -D MPU6050_USE_DMP=$(CONFIG_MPU6050_USE_DMP)
