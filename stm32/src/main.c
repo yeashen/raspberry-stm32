@@ -1,241 +1,80 @@
-/*************************************************************************************
-* Test-program for Olimex â€œSTM32-H103â€, header board for â€œSTM32F103RBT6â€.
-* After program start green LED (LED_E) will blink.
-*
-* Program has to be compiled with optimizer setting "-O0".
-* Otherwise delay via while-loop will not work correctly.
-*************************************************************************************/
-#include "led.h"
-#include "delay.h"
-#include "motor.h"
-#include "pwm.h"
-#include "oled.h"
+/******************************************************************************
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : MiniBalance.c
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : Main functions
+  Function List :
+              main
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
+
+******************************************************************************/
+
 #include "sys.h"
-#include "usart.h"
-#include "timer.h"
-#include "sw_i2c.h"
-#if USE_MPU6050
-#if MPU6050_USE_DMP
-#include "inv_mpu.h"
-#include "inv_mpu_dmp_motion_driver.h"
-#include "hmc5883l.h"
-#else
-#include "mpu6050.h"
-#endif
-#endif
 
-#include "encoder.h"
-#include "user_stdlib.h"
+u8 Way_Angle=2;                             //»ñÈ¡½Ç¶ÈµÄËã·¨£¬1£ºËÄÔªÊı  2£º¿¨¶ûÂü  3£º»¥²¹ÂË²¨ 
+u8 Flag_Qian,Flag_Hou,Flag_Left,Flag_Right,Flag_sudu=2; //À¶ÑÀÒ£¿ØÏà¹ØµÄ±äÁ¿
+int line_velocity = 0, turn_velocity = 0;
+u8 Flag_Stop=1,Flag_Show=0;                 //Í£Ö¹±êÖ¾Î»ºÍ ÏÔÊ¾±êÖ¾Î» Ä¬ÈÏÍ£Ö¹ ÏÔÊ¾´ò¿ª
+int Encoder_Left,Encoder_Right;             //×óÓÒ±àÂëÆ÷µÄÂö³å¼ÆÊı
+int Moto1,Moto2;                            //µç»úPWM±äÁ¿ Ó¦ÊÇMotorµÄ ÏòMotoÖÂ¾´	
+int Temperature;                            //ÏÔÊ¾ÎÂ¶È
+int Voltage;                                //µç³ØµçÑ¹²ÉÑùÏà¹ØµÄ±äÁ¿
+float Angle_Balance,Gyro_Balance,Gyro_Turn; //Æ½ºâÇã½Ç Æ½ºâÍÓÂİÒÇ ×ªÏòÍÓÂİÒÇ
+float Show_Data_Mb;                         //È«¾ÖÏÔÊ¾±äÁ¿£¬ÓÃÓÚÏÔÊ¾ĞèÒª²é¿´µÄÊı¾İ
+u32 Distance;                               //³¬Éù²¨²â¾à
+u8 delay_50,delay_flag,Bi_zhang=0,PID_Send,Flash_Send; //ÑÓÊ±ºÍµ÷²ÎµÈ±äÁ¿
+float Acceleration_Z;                       //ZÖá¼ÓËÙ¶È¼Æ  
+float Balance_Kp=300,Balance_Kd=1,Velocity_Kp=80,Velocity_Ki=0.4;//PID²ÎÊı
+u16 PID_Parameter[10],Flash_Parameter[10];  //FlashÏà¹ØÊı×é
 
-#include "hw_config.h"
-#include "usb_lib.h"
-
-#if USE_MPU6050
-#if MPU6050_USE_DMP
-static signed char gyro_orientation[9] = {-1, 0, 0,
-										   0,-1, 0,
-										   0, 0, 1};
-
-int result;
-#endif
-#endif
-
-#define PWM_START	(630)
-
-#if 0
-int main(int argc, char *argv[])
+int main(void)
 {
-	int ret = 0;
-	Motor_PWM PWM_Ctrl;
-	int pwm = PWM_START, dir = 0;
-	char buf[20];
-
-	delay_init();
-	
-	uart1_init(115200);
-
-	uart2_init(115200);
-	
-	printf("init led...\r\n");
- 	led_init();
-	
-	printf("init oled...\r\n");
-	OLED_Init();
-	OLED_ShowString(10,0, (u8 *)"RaspberrySTM32");
- 	OLED_ShowString(0,16, (u8 *)"Li Xiaoming");  
-	OLED_ShowString(0,32, (u8 *)"mail:");  
-	OLED_ShowString(0,48, (u8 *)"2017/07/29"); 
-	OLED_Refresh_Gram();
-
-	printf("config NVIC...\r\n");
-	NVIC_Configuration();
-	
-	printf("init timer3 pwm...\r\n");
-	TIMER4_PWM_init(999, (uint16_t) (SystemCoreClock / 24000000) - 1);	//72MHz/(999+1)/(2+1)=24kHz
-	
-	printf("inti timer encoder...\r\n");
-	Encoder_Init();
-	
-	printf("init motor...\r\n");
-	motor_init();
-	motor_direction_ctrl(LEFT, FOREWARD);
-	motor_direction_ctrl(RIGHT, FOREWARD);
-	
-	printf("init timer1...\r\n");
-	timer1_init(999, 71, 0);	//T = (999+1)*(71+1)/72MHz = 1ms
-	
-#if USE_MPU6050
-	printf("init soft i2c...\r\n");
-	#if defined(SW_I2C)
-	SwI2C_init();
-	#else 
-	HwI2C_Init();
-	#endif
-	delay_ms(100);
-#if 0	
-	//MPU6050åˆå§‹åŒ–
-	if(mpu6050_check() != TRUE){
-		printf("Check error! Please check!\r\n");
-		return 0;
-	}else{
-		printf("Check OK.\r\n");
-	}
-#endif
-	#if MPU6050_USE_DMP
-	printf("init mpu6050...\r\n");
-	ret = mpu_init(); 
-	//printf("mpu init ret:%d \r\n", ret);
-
-	if(!ret){	 		 
-		printf("mpu initialization complete......\r\n");	 	  //mpu_set_sensor
-		
-		if(!mpu_set_sensors(INV_XYZ_GYRO | INV_XYZ_ACCEL))
-			printf("mpu_set_sensor complete ......\r\n");
-		else
-			printf("mpu_set_sensor come across error ......\r\n");
-		
-		if(!mpu_configure_fifo(INV_XYZ_GYRO | INV_XYZ_ACCEL))	   	  //mpu_configure_fifo
-			printf("mpu_configure_fifo complete ......\r\n");
-		else
-			printf("mpu_configure_fifo come across error ......\r\n");
-		
-		if(!mpu_set_sample_rate(DEFAULT_MPU_HZ))	   	  //mpu_set_sample_rate
-			printf("mpu_set_sample_rate complete ......\r\n");
-		else
-			printf("mpu_set_sample_rate error ......\r\n");
-		
-		if(!dmp_load_motion_driver_firmware())   	  //dmp_load_motion_driver_firmvare
-			printf("dmp_load_motion_driver_firmware complete ......\r\n");
-		else
-			printf("dmp_load_motion_driver_firmware come across error ......\r\n");
-		
-		if(!dmp_set_orientation(inv_orientation_matrix_to_scalar(gyro_orientation))) 	  //dmp_set_orientation
-			printf("dmp_set_orientation complete ......\r\n");
-		else
-			printf("dmp_set_orientation come across error ......\r\n");
-		
-		if(!dmp_enable_feature(DMP_FEATURE_6X_LP_QUAT | DMP_FEATURE_TAP |
-			DMP_FEATURE_ANDROID_ORIENT | DMP_FEATURE_SEND_RAW_ACCEL | DMP_FEATURE_SEND_CAL_GYRO |
-			DMP_FEATURE_GYRO_CAL))		   	  //dmp_enable_feature
-			printf("dmp_enable_feature complete ......\r\n");
-		else
-			printf("dmp_enable_feature come across error ......\r\n");
-		
-		if(!dmp_set_fifo_rate(DEFAULT_MPU_HZ))   	  //dmp_set_fifo_rate
-			printf("dmp_set_fifo_rate complete ......\r\n");
-		else
-			printf("dmp_set_fifo_rate come across error ......\r\n");
-	  
-		run_self_test();
-		if(!mpu_set_dmp_state(1))
-			printf("mpu_set_dmp_state complete ......\r\n");
-		else
-			printf("mpu_set_dmp_state come across error ......\r\n");
-	}
-	#else
-	mpu6050_init();
-	printf("mpu6050 init OK......\r\n");
-	#endif
-#endif
-
-	printf("start timer1...\r\n");
-	TIM_Cmd(TIM1, ENABLE);
-	
-	printf("system init OK\r\n");
-
-	while(1)
+	delay_init();						//=====ÑÓÊ±º¯Êı³õÊ¼»¯	
+	uart_init(115200);					//=====´®¿Ú³õÊ¼»¯Îª
+	JTAG_Set(JTAG_SWD_DISABLE);     	//=====¹Ø±ÕJTAG½Ó¿Ú
+	JTAG_Set(SWD_ENABLE);           	//=====´ò¿ªSWD½Ó¿Ú ¿ÉÒÔÀûÓÃÖ÷°åµÄSWD½Ó¿Úµ÷ÊÔ
+	led_init();                     	//=====³õÊ¼»¯Óë LED Á¬½ÓµÄÓ²¼ş½Ó¿Ú
+	key_init();                     //=====°´¼ü³õÊ¼»¯
+	MY_NVIC_PriorityGroupConfig(2);	//=====ÉèÖÃÖĞ¶Ï·Ö×é
+    robot_pwm_init(7199,0);   //=====³õÊ¼»¯PWM 10KHZ£¬ÓÃÓÚÇı¶¯µç»ú ÈçĞè³õÊ¼»¯µçµ÷½Ó¿Ú 
+	uart3_init(9600);               //=====´®¿Ú3³õÊ¼»¯
+    encoder_init_tim2();            //=====±àÂëÆ÷½Ó¿Ú
+    encoder_init_tim4();            //=====³õÊ¼»¯±àÂëÆ÷2
+	adc_init();                     //=====adc³õÊ¼»¯
+    IIC_Init();                     //=====IIC³õÊ¼»¯
+    MPU6050_initialize();           //=====MPU6050³õÊ¼»¯	
+    DMP_Init();                     //=====³õÊ¼»¯DMP 
+    OLED_Init();                    //=====OLED³õÊ¼»¯	    
+	tim3_cap_init(0XFFFF,72-1);	    //=====³¬Éù²¨³õÊ¼»¯
+	robot_exit_init();        		//=====MPU6050 5ms¶¨Ê±ÖĞ¶Ï³õÊ¼»¯
+    while(1)
 	{
-			
-		#if 1 /* motor */
-		if(dir){
-			pwm -= 1;
-			if(pwm < PWM_START)
-				dir = 0;
-		}else{
-			pwm += 1;
-			if(pwm > PWM_MAX_VALUE)
-				dir = 1;
-		}
-		PWM_Ctrl.pwm1 = pwm;
-		PWM_Ctrl.pwm2 = pwm;
-		TIMER4_PWM_Refresh(&PWM_Ctrl);
-		//printf("pwm=%d\r\n", pwm);
-		delay_ms(50);
-		#endif
-		
-		#if 0 /* led */
-		led_rgb_set(LED_RED);
-		delay_ms(100);
-		led_rgb_set(LED_GREEN);
-		delay_ms(100);
-		led_rgb_set(LED_BLUE);
-		delay_ms(100);
-		#endif
-
-		
-		#if 0 /* printf */
-		printf("hello stm32 for raspberry Pi\r\n");
-		delay_ms(1000);
-		#endif
-	}
-
-	return 0;
-}
-#endif
-
-#if 1
-extern u8 EP2BUSY;
-int main(int argc, char *argv[])
-{
-	delay_init();
-	
-	uart1_init(115200);
-	
-	NVIC_Configuration();
-	
-	printf("usb hardward init...\r\n");
-
-	printf("interrupt config\r\n");
-	USB_Interrupts_Config();    
-
-	printf("usb clk config\r\n");
-	Set_USBClock();  
-
-	printf("usb init\r\n");
-	USB_Init();
-
-	delay_ms(1000);
-
-	printf("system initial OK.\r\n");
-	
-	while(1)
-	{
-		if(EP2BUSY==0)
+		if(Flash_Send==1)        //Ğ´ÈëPID²ÎÊıµ½Flash,ÓÉapp¿ØÖÆ¸ÃÖ¸Áî
 		{
-			EP2BUSY = 1;
-			Joystick_Send(1,1);
-			delay_ms(1000);
+			Flash_Write();	
+			Flash_Send=0;	
+		}	
+		if(Flag_Show==0)          //Ê¹ÓÃMiniBalance APPºÍOLEDÏÔÊ¾ÆÁ
+		{
+			APP_Show();	
+			oled_show();          //===ÏÔÊ¾ÆÁ´ò¿ª
 		}
-	}
+		else                      //Ê¹ÓÃMiniBalanceÉÏÎ»»ú ÉÏÎ»»úÊ¹ÓÃµÄÊ±ºòĞèÒªÑÏ¸ñµÄÊ±Ğò£¬¹Ê´ËÊ±¹Ø±Õapp¼à¿Ø²¿·ÖºÍOLEDÏÔÊ¾ÆÁ
+		{
+			DataScope();          //¿ªÆôMiniBalanceÉÏÎ»»ú
+		}	
+		delay_flag=1;	
+		delay_50=0;
+		while(delay_flag);	     //Í¨¹ıMPU6050µÄINTÖĞ¶ÏÊµÏÖµÄ50ms¾«×¼ÑÓÊ±	
+	} 
 }
-#endif
+

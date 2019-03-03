@@ -3,12 +3,12 @@
   Copyright (C), 2019-2029, DIY Co., Ltd.
 
  ******************************************************************************
-  File Name     : adc.h
+  File Name     : exti.h
   Version       : Initial Draft
   Author        : Juven
   Created       : 2019/2/26
   Last Modified :
-  Description   : adc header
+  Description   : exit init
   Function List :
   History       :
   1.Date        : 2019/2/26
@@ -17,24 +17,31 @@
 
 ******************************************************************************/
 
-#ifndef __ADC_H
-#define __ADC_H	
-#include "stm32f10x.h" 
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
-#include "stm32f10x_adc.h"
+#ifndef __EXTI_H
+#define __EXIT_H	 
 
 #include "sys.h"
+#include "stm32f10x.h"
+#include "stm32f10x_rcc.h"
+#include "stm32f10x_gpio.h"
+#include "stm32f10x_exti.h"
+#include "misc.h"
 
-#define Battery_Ch 6
+#define INT PAin(12)   //PA12连接到MPU6050的中断引脚
 
-void adc_init(void);
+void robot_exit_init(void);	//外部中断初始化	
 
-u16 get_adc(u8 ch);
+#endif
 
-int get_battery_volt(void);   
 
-#endif 
+
+
+
+
+
+
+
+
 
 
 

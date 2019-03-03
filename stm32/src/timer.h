@@ -1,20 +1,29 @@
+/******************************************************************************
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : timer.h
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : timer3 header
+  Function List :
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
+
+******************************************************************************/
+
 #ifndef __TIMER_H
 #define __TIMER_H
+#include <sys.h>	 
+ 
+void tim3_cap_init(u16 arr,u16 psc);
 
-#ifdef __cplusplus
- extern "C" {
+void read_distance(void);
+
+void TIM3_IRQHandler(void);
 #endif
-	 
-#include "stm32f10x.h"
-#include "stm32f10x_tim.h"
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
-	 
-void timer1_init(u16 arr, u16 psc, u8 cmd);
-void timer1_cap_init(u16 arr, u16 psc);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __TIMER_H */

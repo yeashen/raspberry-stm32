@@ -1,9 +1,4 @@
-/*
- $License:
-    Copyright (C) 2011-2012 InvenSense Corporation, All Rights Reserved.
-    See included License.txt for License information.
- $
- */
+
 /**
  *  @addtogroup  DRIVERS Sensor Driver Layer
  *  @brief       Hardware drivers to communicate with sensors via I2C.
@@ -17,21 +12,13 @@
  *                  MPU9150 (or MPU6050 w/ AK8975 on the auxiliary bus)
  *                  MPU9250 (or MPU6500 w/ AK8963 on the auxiliary bus)
  */
-//#include <stdio.h>
-//#include <stdint.h>
+#include <sys.h>
+#include "delay.h"
+#include "usart.h"
+#include "i2c.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "inv_mpu.h"
-#include "hmc5883l.h"
-//#include "stm32f10x.h"
-#include "delay.h"
-#include "usart.h"
-
-#define absx(x)			((x) > 0 ? (x) : -(x))
-
-int dmp_set_gyro_bias(long *bias) ;
-int dmp_set_accel_bias(long *bias);
 
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
@@ -45,85 +32,8 @@ int dmp_set_accel_bias(long *bias);
  * fabsf(float x)
  * min(int a, int b)
  */
-void run_self_test(void)
-{
-    int result;
-//    char test_packet[4] = {0};
-    long gyro[3], accel[3];
-
-    result = mpu_run_self_test(gyro, accel);
-	printf("self_test result: 0x%x\r\n", result);
-    if (result == 0x3/*0x7*/) {
-        /* Test passed. We can trust the gyro data here, so let's push it down
-         * to the DMP.
-         */
-        float sens;
-        unsigned short accel_sens;
-        mpu_get_gyro_sens(&sens);
-        gyro[0] = (long)(gyro[0] * sens);
-        gyro[1] = (long)(gyro[1] * sens);
-        gyro[2] = (long)(gyro[2] * sens);
-        dmp_set_gyro_bias(gyro);
-        mpu_get_accel_sens(&accel_sens);
-        accel[0] *= accel_sens;
-        accel[1] *= accel_sens;
-        accel[2] *= accel_sens;
-        dmp_set_accel_bias(accel);
-		printf("setting bias succesfully ......\r\n");
-    }
-	else
-	{
-		printf("bias has not been modified ......\n");
-	}
-}
-
- unsigned short inv_orientation_matrix_to_scalar(
-    const signed char *mtx)
-{
-    unsigned short scalar;
-
-    /*
-       XYZ  010_001_000 Identity Matrix
-       XZY  001_010_000
-       YXZ  010_000_001
-       YZX  000_010_001
-       ZXY  001_000_010
-       ZYX  000_001_010
-     */
-
-    scalar = inv_row_2_scale(mtx);
-    scalar |= inv_row_2_scale(mtx + 3) << 3;
-    scalar |= inv_row_2_scale(mtx + 6) << 6;
-
-
-    return scalar;
-}
- unsigned short inv_row_2_scale(const signed char *row)
-{
-    unsigned short b;
-
-    if (row[0] > 0)
-        b = 0;
-    else if (row[0] < 0)
-        b = 4;
-    else if (row[1] > 0)
-        b = 1;
-    else if (row[1] < 0)
-        b = 5;
-    else if (row[2] > 0)
-        b = 2;
-    else if (row[2] < 0)
-        b = 6;
-    else
-        b = 7;      // error
-    return b;
-}
-
-
-void get_ms(unsigned long *time)
-{
-
-}
+#define MPU6050
+#define MOTION_DRIVER_TARGET_MSP430
 
 #if defined MOTION_DRIVER_TARGET_MSP430
 /*#include "msp430.h"
@@ -131,10 +41,10 @@ void get_ms(unsigned long *time)
 #include "msp430_clock.h"
 #include "msp430_interrupt.h" */
 
-#define i2c_write   i2cwrite
-#define i2c_read    i2cread
+#define i2c_write   i2cWrite
+#define i2c_read    i2cRead
 #define delay_ms    delay_ms
-#define get_ms      get_ms
+#define get_ms      myget_ms
 
 //static int reg_int_cb(struct int_param_s *int_param)
 //{
@@ -144,23 +54,20 @@ void get_ms(unsigned long *time)
 //}	  
 //#define log_i(...)     do {} while (0)
 //#define log_e(...)     do {} while (0)
-#define log_e    PrintChar
-#define log_i    PrintChar
+#define log_e    printf
+#define log_i    printf
 /* labs is already defined by TI's toolchain. */
 /* fabs is for doubles. fabsf is for floats. */
 #define fabs        fabsf
 #define min(a,b) ((a<b)?a:b)
 
 #elif defined EMPL_TARGET_MSP430
-//#include "msp430.h"
-//#include "msp430_i2c.h"
-//#include "msp430_clock.h"
-//#include "msp430_interrupt.h"
+#include "msp430.h"
+#include "msp430_i2c.h"
+#include "msp430_clock.h"
+#include "msp430_interrupt.h"
 #include "log.h"
-#define i2c_write   msp430_i2c_write
-#define i2c_read    msp430_i2c_read
-#define delay_ms    msp430_delay_ms
-#define get_ms      msp430_get_clock_ms
+
 static inline int reg_int_cb(struct int_param_s *int_param)
 {
     return msp430_reg_int_cb(int_param->cb, int_param->pin, int_param->lp_exit,
@@ -172,7 +79,6 @@ static inline int reg_int_cb(struct int_param_s *int_param)
 /* fabs is for doubles. fabsf is for floats. */
 #define fabs        fabsf
 #define min(a,b) ((a<b)?a:b)
-
 #elif defined EMPL_TARGET_UC3L0
 /* Instead of using the standard TWI driver from the ASF library, we're using
  * a TWI driver that follows the slave address + register address convention.
@@ -187,7 +93,6 @@ static inline int reg_int_cb(struct int_param_s *int_param)
 #define i2c_read(a, b, c, d)    twi_read(a, b, d, c)
 /* delay_ms is a function already defined in ASF. */
 #define get_ms  uc3l0_get_clock_ms
-
 static inline int reg_int_cb(struct int_param_s *int_param)
 {
     sensor_board_irq_connect(int_param->pin, int_param->cb, int_param->arg);
@@ -198,26 +103,6 @@ static inline int reg_int_cb(struct int_param_s *int_param)
 /* UC3 is a 32-bit processor, so abs and labs are equivalent. */
 #define labs        abs
 #define fabs(x)     (((x)>0)?(x):-(x))
-
-// TODO: for STM32F103
-#elif defined MOTION_DRIVER_TARGET_STM32F103
-#if defined(SW_I2C)
-#include "sw_i2c.h"
-#define i2c_write   SwI2C_WriteBytes
-#define i2c_read    SwI2C_ReadBytes
-#elif defined(HW_I2C)
-#include "hw_i2c.h"
-#define i2c_write   HwI2C_WriteBytes
-#define i2c_read    HwI2C_ReadBytes
-#else
-#error Please select the I2C type - soft_i2c or hard_i2c
-#endif
-
-#define get_ms      get_ms
-#define log_i       printf
-#define log_e       printf
-#define min(a,b) 	((a<b)?a:b)
-
 #else
 //#error  Gyro driver is missing the system layer implementations.
 #endif
@@ -618,7 +503,7 @@ const struct hw_s hw = {
 };
 */
 const struct hw_s hw={
-  0xD0,//0x68,	 //addr
+  0x68,	 //addr
   1024,	 //max_fifo
   118,	 //num_reg
   340,	 //temp_sens
@@ -807,7 +692,7 @@ static int set_int_enable(unsigned char enable)
             tmp = BIT_DMP_INT_EN;
         else
             tmp = 0x00;
-        if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, &tmp))
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &tmp))
             return -1;
         st.chip_cfg.int_enable = tmp;
     } else {
@@ -819,12 +704,13 @@ static int set_int_enable(unsigned char enable)
             tmp = BIT_DATA_RDY_EN;
         else
             tmp = 0x00;
-        if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, &tmp))
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &tmp))
             return -1;
         st.chip_cfg.int_enable = tmp;
     }
     return 0;
 }
+
 
 /**
  *  @brief      Register dump for testing.
@@ -838,7 +724,7 @@ int mpu_reg_dump(void)
     for (ii = 0; ii < st.hw->num_reg; ii++) {
         if (ii == st.reg->fifo_r_w || ii == st.reg->mem_r_w)
             continue;
-        if (!i2c_read(st.hw->addr, ii, 1, &data))
+        if (i2c_read(st.hw->addr, ii, 1, &data))
             return -1;
         //log_i("%#5x: %#5x\r\n", ii, data);
     }
@@ -858,25 +744,7 @@ int mpu_read_reg(unsigned char reg, unsigned char *data)
         return -1;
     if (reg >= st.hw->num_reg)
         return -1;
-    return !i2c_read(st.hw->addr, reg, 1, data);
-}
-
-/** Check MPU6050
- * get ID and is or not WHO_AM_I 
- */
-bool mpu6050_check()
-{
-    uint8_t id;
-    uint8_t data[2];
-
-    id = (i2c_read(st.hw->addr, 0x75, 1, data)) << 1;
-    if(id == 0x68){
-        log_e("Check OK, DEV_ID: 0x%x\r\n", id);
-        return TRUE;
-    }else{
-        log_e("Check NG! DEV_ID: 0x%x\r\n", id);
-        return FALSE;
-    }
+    return i2c_read(st.hw->addr, reg, 1, data);
 }
 
 /**
@@ -898,25 +766,19 @@ int mpu_init(void)
 
     /* Reset device. */
     data[0] = 0x80;//BIT_RESET;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &(data[0]))){
-		log_e("write -1 error!");
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &(data[0])))
         return -1;
-    }
     delay_ms(100);
 
     /* Wake up chip. */
     data[0] = 0x00;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &(data[0]))){
-		log_e("write -2 error!");
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &(data[0])))
         return -1;
-    }
 
 #if defined MPU6050
     /* Check product revision. */
-    if (!i2c_read(st.hw->addr, st.reg->accel_offs, 6, data)){
-		log_e("read -1 error!");
+    if (i2c_read(st.hw->addr, st.reg->accel_offs, 6, data))
         return -1;
-    }
     rev = ((data[5] & 0x01) << 2) | ((data[3] & 0x01) << 1) |
         (data[1] & 0x01);
 
@@ -927,21 +789,18 @@ int mpu_init(void)
         else if (rev == 2)
             st.chip_cfg.accel_half = 0;
         else {
-            log_e("Unsupported software product rev %d.\n", rev);
+            log_e("Unsupported software product rev %d.\n",rev);
             return -1;
         }
     } else {
-        if (!i2c_read(st.hw->addr, st.reg->prod_id, 1, &(data[0]))){
-			log_e("read -2 error!");
+        if (i2c_read(st.hw->addr, st.reg->prod_id, 1, &(data[0])))
             return -1;
-        }
         rev = data[0] & 0x0F;
         if (!rev) {
-            log_e("Product ID read as 0 indicates device is either "
-                "incompatible or an MPU3050.\n");
+            log_e("Product ID read as 0 indicates device is either incompatible or an MPU3050.\r\n");
             return -1;
         } else if (rev == 4) {
-            log_i("Half sensitivity part found.\n");
+            log_i("Half sensitivity part found.\r\n");
             st.chip_cfg.accel_half = 1;
         } else
             st.chip_cfg.accel_half = 0;
@@ -953,7 +812,7 @@ int mpu_init(void)
     if (rev == 0x1)
         st.chip_cfg.accel_half = 0;
     else {
-        log_e("Unsupported software product rev %d.\n", rev);
+        log_e("Unsupported software product rev %d.\r\n", rev);
         return -1;
     }
 
@@ -961,10 +820,8 @@ int mpu_init(void)
      * first 3kB are needed by the DMP, we'll use the last 1kB for the FIFO.
      */
     data[0] = BIT_FIFO_SIZE_1024 | 0x8;
-    if (!i2c_write(st.hw->addr, st.reg->accel_cfg2, 1, data)){
-		log_e("write -3 error!");
+    if (i2c_write(st.hw->addr, st.reg->accel_cfg2, 1, data))
         return -1;
-    }
 #endif
 
     /* Set to invalid values to ensure no I2C writes are skipped. */
@@ -1014,12 +871,6 @@ int mpu_init(void)
         return -1;
 #endif
 
-#ifdef HMC5883
-	if (mpu_set_bypass(0))
-        return -1;
-	hmc_init();
-#endif
-
     mpu_set_sensors(0);
     return 0;
 }
@@ -1050,7 +901,7 @@ int mpu_lp_accel_mode(unsigned char rate)
         mpu_set_int_latched(0);
         tmp[0] = 0;
         tmp[1] = BIT_STBY_XYZG;
-        if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, tmp))
+        if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, tmp))
             return -1;
         st.chip_cfg.lp_accel_mode = 0;
         return 0;
@@ -1079,7 +930,7 @@ int mpu_lp_accel_mode(unsigned char rate)
         mpu_set_lpf(20);
     }
     tmp[1] = (tmp[1] << 6) | BIT_STBY_XYZG;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, tmp))
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, tmp))
         return -1;
 #elif defined MPU6500
     /* Set wake frequency. */
@@ -1103,10 +954,10 @@ int mpu_lp_accel_mode(unsigned char rate)
         tmp[0] = INV_LPA_320HZ;
     else
         tmp[0] = INV_LPA_640HZ;
-    if (!i2c_write(st.hw->addr, st.reg->lp_accel_odr, 1, tmp))
+    if (i2c_write(st.hw->addr, st.reg->lp_accel_odr, 1, tmp))
         return -1;
     tmp[0] = BIT_LPA_CYCLE;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, tmp))
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, tmp))
         return -1;
 #endif
     st.chip_cfg.sensors = INV_XYZ_ACCEL;
@@ -1130,7 +981,7 @@ int mpu_get_gyro_reg(short *data, unsigned long *timestamp)
     if (!(st.chip_cfg.sensors & INV_XYZ_GYRO))
         return -1;
 
-    if (!i2c_read(st.hw->addr, st.reg->raw_gyro, 6, tmp))
+    if (i2c_read(st.hw->addr, st.reg->raw_gyro, 6, tmp))
         return -1;
     data[0] = (tmp[0] << 8) | tmp[1];
     data[1] = (tmp[2] << 8) | tmp[3];
@@ -1153,7 +1004,7 @@ int mpu_get_accel_reg(short *data, unsigned long *timestamp)
     if (!(st.chip_cfg.sensors & INV_XYZ_ACCEL))
         return -1;
 
-    if (!i2c_read(st.hw->addr, st.reg->raw_accel, 6, tmp))
+    if (i2c_read(st.hw->addr, st.reg->raw_accel, 6, tmp))
         return -1;
     data[0] = (tmp[0] << 8) | tmp[1];
     data[1] = (tmp[2] << 8) | tmp[3];
@@ -1177,7 +1028,7 @@ int mpu_get_temperature(long *data, unsigned long *timestamp)
     if (!(st.chip_cfg.sensors))
         return -1;
 
-    if (!i2c_read(st.hw->addr, st.reg->temp, 2, tmp))
+    if (i2c_read(st.hw->addr, st.reg->temp, 2, tmp))
         return -1;
     raw = (tmp[0] << 8) | tmp[1];
     if (timestamp)
@@ -1206,7 +1057,7 @@ int mpu_set_accel_bias(const long *accel_bias)
     if (!accel_bias[0] && !accel_bias[1] && !accel_bias[2])
         return 0;
 
-    if (!i2c_read(st.hw->addr, 3, 3, data))
+    if (i2c_read(st.hw->addr, 3, 3, data))
         return -1;
     fg[0] = ((data[0] >> 4) + 8) & 0xf;
     fg[1] = ((data[1] >> 4) + 8) & 0xf;
@@ -1216,7 +1067,7 @@ int mpu_set_accel_bias(const long *accel_bias)
     accel_hw[1] = (short)(accel_bias[1] * 2 / (64 + fg[1]));
     accel_hw[2] = (short)(accel_bias[2] * 2 / (64 + fg[2]));
 
-    if (!i2c_read(st.hw->addr, 0x06, 6, data))
+    if (i2c_read(st.hw->addr, 0x06, 6, data))
         return -1;
 
     got_accel[0] = ((short)data[0] << 8) | data[1];
@@ -1234,7 +1085,7 @@ int mpu_set_accel_bias(const long *accel_bias)
     data[4] = (accel_hw[2] >> 8) & 0xff;
     data[5] = (accel_hw[2]) & 0xff;
 
-    if (!i2c_write(st.hw->addr, 0x06, 6, data))
+    if (i2c_write(st.hw->addr, 0x06, 6, data))
         return -1;
     return 0;
 }
@@ -1251,18 +1102,18 @@ int mpu_reset_fifo(void)
         return -1;
 
     data = 0;
-    if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->fifo_en, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, &data))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
         return -1;
 
     if (st.chip_cfg.dmp_on) {
         data = BIT_FIFO_RST | BIT_DMP_RST;
-        if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
             return -1;
-        delay_ms(50);
+       
         data = BIT_DMP_EN | BIT_FIFO_EN;
         if (st.chip_cfg.sensors & INV_XYZ_COMPASS)
             data |= BIT_AUX_IF_EN;
@@ -1272,29 +1123,29 @@ int mpu_reset_fifo(void)
             data = BIT_DMP_INT_EN;
         else
             data = 0;
-        if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
             return -1;
         data = 0;
-        if (!i2c_write(st.hw->addr, st.reg->fifo_en, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, &data))
             return -1;
     } else {
         data = BIT_FIFO_RST;
-        if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
             return -1;
         if (st.chip_cfg.bypass_mode || !(st.chip_cfg.sensors & INV_XYZ_COMPASS))
             data = BIT_FIFO_EN;
         else
             data = BIT_FIFO_EN | BIT_AUX_IF_EN;
-        if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &data))
             return -1;
-        delay_ms(50);
+    
         if (st.chip_cfg.int_enable)
             data = BIT_DATA_RDY_EN;
         else
             data = 0;
-        if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, &data))
             return -1;
-        if (!i2c_write(st.hw->addr, st.reg->fifo_en, 1, &st.chip_cfg.fifo_enable))
+        if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, &st.chip_cfg.fifo_enable))
             return -1;
     }
     return 0;
@@ -1358,7 +1209,7 @@ int mpu_set_gyro_fsr(unsigned short fsr)
 
     if (st.chip_cfg.gyro_fsr == (data >> 3))
         return 0;
-    if (!i2c_write(st.hw->addr, st.reg->gyro_cfg, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->gyro_cfg, 1, &data))
         return -1;
     st.chip_cfg.gyro_fsr = data >> 3;
     return 0;
@@ -1423,7 +1274,7 @@ int mpu_set_accel_fsr(unsigned char fsr)
 
     if (st.chip_cfg.accel_fsr == (data >> 3))
         return 0;
-    if (!i2c_write(st.hw->addr, st.reg->accel_cfg, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->accel_cfg, 1, &data))
         return -1;
     st.chip_cfg.accel_fsr = data >> 3;
     return 0;
@@ -1492,7 +1343,7 @@ int mpu_set_lpf(unsigned short lpf)
 
     if (st.chip_cfg.lpf == data)
         return 0;
-    if (!i2c_write(st.hw->addr, st.reg->lpf, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->lpf, 1, &data))
         return -1;
     st.chip_cfg.lpf = data;
     return 0;
@@ -1545,7 +1396,7 @@ int mpu_set_sample_rate(unsigned short rate)
             rate = 1000;
 
         data = 1000 / rate - 1;
-        if (!i2c_write(st.hw->addr, st.reg->rate_div, 1, &data))
+        if (i2c_write(st.hw->addr, st.reg->rate_div, 1, &data))
             return -1;
 
         st.chip_cfg.sample_rate = 1000 / (1 + data);
@@ -1595,7 +1446,7 @@ int mpu_set_compass_sample_rate(unsigned short rate)
         return -1;
 
     div = st.chip_cfg.sample_rate / rate - 1;
-    if (!i2c_write(st.hw->addr, st.reg->s4_ctrl, 1, &div))
+    if (i2c_write(st.hw->addr, st.reg->s4_ctrl, 1, &div))
         return -1;
     st.chip_cfg.compass_sample_rate = st.chip_cfg.sample_rate / (div + 1);
     return 0;
@@ -1756,7 +1607,7 @@ int mpu_set_sensors(unsigned char sensors)
         data = 0;
     else
         data = BIT_SLEEP;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data)) {
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, &data)) {
         st.chip_cfg.sensors = 0;
         return -1;
     }
@@ -1771,7 +1622,7 @@ int mpu_set_sensors(unsigned char sensors)
         data |= BIT_STBY_ZG;
     if (!(sensors & INV_XYZ_ACCEL))
         data |= BIT_STBY_XYZA;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_2, 1, &data)) {
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_2, 1, &data)) {
         st.chip_cfg.sensors = 0;
         return -1;
     }
@@ -1787,7 +1638,7 @@ int mpu_set_sensors(unsigned char sensors)
     else
         mpu_set_bypass(0);
 #else
-    if (!i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &user_ctrl))
+    if (i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &user_ctrl))
         return -1;
     /* Handle AKM power management. */
     if (sensors & INV_XYZ_COMPASS) {
@@ -1801,10 +1652,10 @@ int mpu_set_sensors(unsigned char sensors)
         user_ctrl |= BIT_DMP_EN;
     else
         user_ctrl &= ~BIT_DMP_EN;
-    if (!i2c_write(st.hw->addr, st.reg->s1_do, 1, &data))
+    if (i2c_write(st.hw->addr, st.reg->s1_do, 1, &data))
         return -1;
     /* Enable/disable I2C master mode. */
-    if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &user_ctrl))
+    if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &user_ctrl))
         return -1;
 #endif
 #endif
@@ -1825,7 +1676,7 @@ int mpu_get_int_status(short *status)
     unsigned char tmp[2];
     if (!st.chip_cfg.sensors)
         return -1;
-    if (!i2c_read(st.hw->addr, st.reg->dmp_int_status, 2, tmp))
+    if (i2c_read(st.hw->addr, st.reg->dmp_int_status, 2, tmp))
         return -1;
     status[0] = (tmp[0] << 8) | tmp[1];
     return 0;
@@ -1875,7 +1726,7 @@ int mpu_read_fifo(short *gyro, short *accel, unsigned long *timestamp,
     if (st.chip_cfg.fifo_enable & INV_XYZ_ACCEL)
         packet_size += 6;
 
-    if (!i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, data))
+    if (i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, data))
         return -1;
     fifo_count = (data[0] << 8) | data[1];
     if (fifo_count < packet_size)
@@ -1883,7 +1734,7 @@ int mpu_read_fifo(short *gyro, short *accel, unsigned long *timestamp,
 //    log_i("FIFO count: %hd\n", fifo_count);
     if (fifo_count > (st.hw->max_fifo >> 1)) {
         /* FIFO is 50% full, better check overflow bit. */
-        if (!i2c_read(st.hw->addr, st.reg->int_status, 1, data))
+        if (i2c_read(st.hw->addr, st.reg->int_status, 1, data))
             return -1;
         if (data[0] & BIT_FIFO_OVERFLOW) {
             mpu_reset_fifo();
@@ -1892,7 +1743,7 @@ int mpu_read_fifo(short *gyro, short *accel, unsigned long *timestamp,
     }
     get_ms((unsigned long*)timestamp);
 
-    if (!i2c_read(st.hw->addr, st.reg->fifo_r_w, packet_size, data))
+    if (i2c_read(st.hw->addr, st.reg->fifo_r_w, packet_size, data))
         return -1;
     more[0] = fifo_count / packet_size - 1;
     sensors[0] = 0;
@@ -1935,61 +1786,30 @@ int mpu_read_fifo_stream(unsigned short length, unsigned char *data,
 {
     unsigned char tmp[2];
     unsigned short fifo_count;
-	unsigned char packet_size = 0;
-	
-    if (!st.chip_cfg.dmp_on){
-		log_e("dmp_on not open");
-		return -1;
-    }
-    if (!st.chip_cfg.sensors){
-		log_e("sensors not open");
+    if (!st.chip_cfg.dmp_on)
         return -1;
-    }
-
-	if (st.chip_cfg.fifo_enable & INV_X_GYRO)
-        packet_size += 2;
-    if (st.chip_cfg.fifo_enable & INV_Y_GYRO)
-        packet_size += 2;
-    if (st.chip_cfg.fifo_enable & INV_Z_GYRO)
-        packet_size += 2;
-    if (st.chip_cfg.fifo_enable & INV_XYZ_ACCEL)
-        packet_size += 6;
-
-    if (!i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, tmp)){
-		log_e("read fifo_count_h fail!\r\n");
+    if (!st.chip_cfg.sensors)
         return -1;
-    }
-	
+
+    if (i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, tmp))
+        return -1;
     fifo_count = (tmp[0] << 8) | tmp[1];
-
-	if (fifo_count < packet_size)
-        return 0;
-	
     if (fifo_count < length) {
-		log_e("fifo_count < length!\r\n");
         more[0] = 0;
         return -1;
     }
-	
     if (fifo_count > (st.hw->max_fifo >> 1)) {
-		//log_e("fifo_count=%d max_fifo>>1 =%d\r\n", fifo_count ,st.hw->max_fifo >> 1);
-        // FIFO is 50% full, better check overflow bit. 
-        if (!i2c_read(st.hw->addr, st.reg->int_status, 1, tmp)){
-			log_e("read int_status fail!\r\n");
+        /* FIFO is 50% full, better check overflow bit. */
+        if (i2c_read(st.hw->addr, st.reg->int_status, 1, tmp))
             return -1;
-        }
         if (tmp[0] & BIT_FIFO_OVERFLOW) {
-			//log_e("tmp[0]=0x%x FIFO overflow!\r\n", tmp[0]);
             mpu_reset_fifo();
             return -2;
         }
     }
-	
 
-    if (!i2c_read(st.hw->addr, st.reg->fifo_r_w, length, data)){
-		log_e("read fifo_r_w fail!\r\n");
-		return -1;
-    }
+    if (i2c_read(st.hw->addr, st.reg->fifo_r_w, length, data))
+        return -1;
     more[0] = fifo_count / length - 1;
     return 0;
 }
@@ -2007,10 +1827,10 @@ int mpu_set_bypass(unsigned char bypass_on)
         return 0;
 
     if (bypass_on) {
-        if (!i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
+        if (i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
             return -1;
         tmp &= ~BIT_AUX_IF_EN;
-        if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
             return -1;
         delay_ms(3);
         tmp = BIT_BYPASS_EN;
@@ -2018,17 +1838,17 @@ int mpu_set_bypass(unsigned char bypass_on)
             tmp |= BIT_ACTL;
         if (st.chip_cfg.latched_int)
             tmp |= BIT_LATCH_EN | BIT_ANY_RD_CLR;
-        if (!i2c_write(st.hw->addr, st.reg->int_pin_cfg, 1, &tmp))
+        if (i2c_write(st.hw->addr, st.reg->int_pin_cfg, 1, &tmp))
             return -1;
     } else {
         /* Enable I2C master mode if compass is being used. */
-        if (!i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
+        if (i2c_read(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
             return -1;
         if (st.chip_cfg.sensors & INV_XYZ_COMPASS)
             tmp |= BIT_AUX_IF_EN;
         else
             tmp &= ~BIT_AUX_IF_EN;
-        if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, &tmp))
             return -1;
         delay_ms(3);
         if (st.chip_cfg.active_low_int)
@@ -2037,7 +1857,7 @@ int mpu_set_bypass(unsigned char bypass_on)
             tmp = 0;
         if (st.chip_cfg.latched_int)
             tmp |= BIT_LATCH_EN | BIT_ANY_RD_CLR;
-        if (!i2c_write(st.hw->addr, st.reg->int_pin_cfg, 1, &tmp))
+        if (i2c_write(st.hw->addr, st.reg->int_pin_cfg, 1, &tmp))
             return -1;
     }
     st.chip_cfg.bypass_mode = bypass_on;
@@ -2075,7 +1895,7 @@ int mpu_set_int_latched(unsigned char enable)
         tmp |= BIT_BYPASS_EN;
     if (st.chip_cfg.active_low_int)
         tmp |= BIT_ACTL;
-    if (!i2c_write(st.hw->addr, st.reg->int_pin_cfg, 1, &tmp))
+    if (i2c_write(st.hw->addr, st.reg->int_pin_cfg, 1, &tmp))
         return -1;
     st.chip_cfg.latched_int = enable;
     return 0;
@@ -2086,7 +1906,7 @@ static int get_accel_prod_shift(float *st_shift)
 {
     unsigned char tmp[4], shift_code[3], ii;
 
-    if (!i2c_read(st.hw->addr, 0x0D, 4, tmp))
+    if (i2c_read(st.hw->addr, 0x0D, 4, tmp))
         return 0x07;
 
     shift_code[0] = ((tmp[0] & 0xE0) >> 3) | ((tmp[3] & 0x30) >> 4);
@@ -2114,8 +1934,7 @@ static int accel_self_test(long *bias_regular, long *bias_st)
 
     get_accel_prod_shift(st_shift);
     for(jj = 0; jj < 3; jj++) {
-        //st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
-        st_shift_cust = absx(bias_regular[jj] - bias_st[jj]) / 65536.f;
+        st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
         if (st_shift[jj]) {
             st_shift_var = st_shift_cust / st_shift[jj] - 1.f;
             if (fabs(st_shift_var) > test.max_accel_var)
@@ -2134,7 +1953,7 @@ static int gyro_self_test(long *bias_regular, long *bias_st)
     unsigned char tmp[3];
     float st_shift, st_shift_cust, st_shift_var;
 
-    if (!i2c_read(st.hw->addr, 0x0D, 3, tmp))
+    if (i2c_read(st.hw->addr, 0x0D, 3, tmp))
         return 0x07;
 
     tmp[0] &= 0x1F;
@@ -2142,8 +1961,7 @@ static int gyro_self_test(long *bias_regular, long *bias_st)
     tmp[2] &= 0x1F;
 
     for (jj = 0; jj < 3; jj++) {
-        //st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
-        st_shift_cust = absx(bias_regular[jj] - bias_st[jj]) / 65536.f;
+        st_shift_cust = labs(bias_regular[jj] - bias_st[jj]) / 65536.f;
         if (tmp[jj]) {
             st_shift = 3275.f / test.gyro_sens;
             while (--tmp[jj])
@@ -2169,18 +1987,18 @@ static int compass_self_test(void)
     mpu_set_bypass(1);
 
     tmp[0] = AKM_POWER_DOWN;
-    if (!i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp))
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp))
         return 0x07;
     tmp[0] = AKM_BIT_SELF_TEST;
-    if (!i2c_write(st.chip_cfg.compass_addr, AKM_REG_ASTC, 1, tmp))
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_ASTC, 1, tmp))
         goto AKM_restore;
     tmp[0] = AKM_MODE_SELF_TEST;
-    if (!i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp))
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp))
         goto AKM_restore;
 
     do {
         delay_ms(10);
-        if (!i2c_read(st.chip_cfg.compass_addr, AKM_REG_ST1, 1, tmp))
+        if (i2c_read(st.chip_cfg.compass_addr, AKM_REG_ST1, 1, tmp))
             goto AKM_restore;
         if (tmp[0] & AKM_DATA_READY)
             break;
@@ -2188,7 +2006,7 @@ static int compass_self_test(void)
     if (!(tmp[0] & AKM_DATA_READY))
         goto AKM_restore;
 
-    if (!i2c_read(st.chip_cfg.compass_addr, AKM_REG_HXL, 6, tmp))
+    if (i2c_read(st.chip_cfg.compass_addr, AKM_REG_HXL, 6, tmp))
         goto AKM_restore;
 
     result = 0;
@@ -2218,64 +2036,63 @@ static int get_st_biases(long *gyro, long *accel, unsigned char hw_test)
     unsigned char data[MAX_PACKET_LENGTH];
     unsigned char packet_count, ii;
     unsigned short fifo_count;
-	unsigned char has_accel = 1;
 
     data[0] = 0x01;
     data[1] = 0;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, data))
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, data))
         return -1;
     delay_ms(200);
     data[0] = 0;
-    if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->int_enable, 1, data))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->fifo_en, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, data))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, data))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->i2c_mst, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->i2c_mst, 1, data))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
         return -1;
     data[0] = BIT_FIFO_RST | BIT_DMP_RST;
-    if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
         return -1;
     delay_ms(15);
     data[0] = st.test->reg_lpf;
-    if (!i2c_write(st.hw->addr, st.reg->lpf, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->lpf, 1, data))
         return -1;
     data[0] = st.test->reg_rate_div;
-    if (!i2c_write(st.hw->addr, st.reg->rate_div, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->rate_div, 1, data))
         return -1;
     if (hw_test)
         data[0] = st.test->reg_gyro_fsr | 0xE0;
     else
         data[0] = st.test->reg_gyro_fsr;
-    if (!i2c_write(st.hw->addr, st.reg->gyro_cfg, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->gyro_cfg, 1, data))
         return -1;
 
     if (hw_test)
         data[0] = st.test->reg_accel_fsr | 0xE0;
     else
         data[0] = test.reg_accel_fsr;
-    if (!i2c_write(st.hw->addr, st.reg->accel_cfg, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->accel_cfg, 1, data))
         return -1;
     if (hw_test)
         delay_ms(200);
 
     /* Fill FIFO for test.wait_ms milliseconds. */
     data[0] = BIT_FIFO_EN;
-    if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->user_ctrl, 1, data))
         return -1;
 
     data[0] = INV_XYZ_GYRO | INV_XYZ_ACCEL;
-    if (!i2c_write(st.hw->addr, st.reg->fifo_en, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, data))
         return -1;
     delay_ms(test.wait_ms);
     data[0] = 0;
-    if (!i2c_write(st.hw->addr, st.reg->fifo_en, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->fifo_en, 1, data))
         return -1;
 
-    if (!i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, data))
+    if (i2c_read(st.hw->addr, st.reg->fifo_count_h, 2, data))
         return -1;
 
     fifo_count = (data[0] << 8) | data[1];
@@ -2285,7 +2102,7 @@ static int get_st_biases(long *gyro, long *accel, unsigned char hw_test)
 
     for (ii = 0; ii < packet_count; ii++) {
         short accel_cur[3], gyro_cur[3];
-        if (!i2c_read(st.hw->addr, st.reg->fifo_r_w, MAX_PACKET_LENGTH, data))
+        if (i2c_read(st.hw->addr, st.reg->fifo_r_w, MAX_PACKET_LENGTH, data))
             return -1;
         accel_cur[0] = ((short)data[0] << 8) | data[1];
         accel_cur[1] = ((short)data[2] << 8) | data[3];
@@ -2473,9 +2290,9 @@ int mpu_write_mem(unsigned short mem_addr, unsigned short length,
     if (tmp[1] + length > st.hw->bank_size)
         return -1;
 
-    if (!i2c_write(st.hw->addr, st.reg->bank_sel, 2, tmp))
+    if (i2c_write(st.hw->addr, st.reg->bank_sel, 2, tmp))
         return -1;
-    if (!i2c_write(st.hw->addr, st.reg->mem_r_w, length, data))
+    if (i2c_write(st.hw->addr, st.reg->mem_r_w, length, data))
         return -1;
     return 0;
 }
@@ -2506,9 +2323,9 @@ int mpu_read_mem(unsigned short mem_addr, unsigned short length,
     if (tmp[1] + length > st.hw->bank_size)
         return -1;
 
-    if (!i2c_write(st.hw->addr, st.reg->bank_sel, 2, tmp))
+    if (i2c_write(st.hw->addr, st.reg->bank_sel, 2, tmp))
         return -1;
-    if (!i2c_read(st.hw->addr, st.reg->mem_r_w, length, data))
+    if (i2c_read(st.hw->addr, st.reg->mem_r_w, length, data))
         return -1;
     return 0;
 }
@@ -2549,7 +2366,7 @@ int mpu_load_firmware(unsigned short length, const unsigned char *firmware,
     /* Set program start address. */
     tmp[0] = start_addr >> 8;
     tmp[1] = start_addr & 0xFF;
-    if (!i2c_write(st.hw->addr, st.reg->prgm_start_h, 2, tmp))
+    if (i2c_write(st.hw->addr, st.reg->prgm_start_h, 2, tmp))
         return -1;
 
     st.chip_cfg.dmp_loaded = 1;
@@ -2729,13 +2546,13 @@ int mpu_get_compass_reg(short *data, unsigned long *timestamp)
         return -1;
 
 #ifdef AK89xx_BYPASS
-    if (!i2c_read(st.chip_cfg.compass_addr, AKM_REG_ST1, 8, tmp))
+    if (i2c_read(st.chip_cfg.compass_addr, AKM_REG_ST1, 8, tmp))
         return -1;
     tmp[8] = AKM_SINGLE_MEASUREMENT;
-    if (!i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp+8))
+    if (i2c_write(st.chip_cfg.compass_addr, AKM_REG_CNTL, 1, tmp+8))
         return -1;
 #else
-    if (!i2c_read(st.hw->addr, st.reg->raw_compass, 8, tmp))
+    if (i2c_read(st.hw->addr, st.reg->raw_compass, 8, tmp))
         return -1;
 #endif
 
@@ -2894,7 +2711,7 @@ int mpu_lp_motion_interrupt(unsigned short thresh, unsigned char time,
          * reading.
          */
         data[0] = INV_FILTER_256HZ_NOLPF2;
-        if (!i2c_write(st.hw->addr, st.reg->lpf, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->lpf, 1, data))
             return -1;
 
         /* NOTE: Digital high pass filter should be configured here. Since this
@@ -2905,19 +2722,19 @@ int mpu_lp_motion_interrupt(unsigned short thresh, unsigned char time,
         /* Configure the device to send motion interrupts. */
         /* Enable motion interrupt. */
         data[0] = BIT_MOT_INT_EN;
-        if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, data))
             goto lp_int_restore;
 
         /* Set motion interrupt parameters. */
         data[0] = thresh_hw;
         data[1] = time;
-        if (!i2c_write(st.hw->addr, st.reg->motion_thr, 2, data))
+        if (i2c_write(st.hw->addr, st.reg->motion_thr, 2, data))
             goto lp_int_restore;
 
         /* Force hardware to "lock" current accel sample. */
         delay_ms(5);
         data[0] = (st.chip_cfg.accel_fsr << 3) | BITS_HPF;
-        if (!i2c_write(st.hw->addr, st.reg->accel_cfg, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->accel_cfg, 1, data))
             goto lp_int_restore;
 
         /* Set up LP accel mode. */
@@ -2931,7 +2748,7 @@ int mpu_lp_motion_interrupt(unsigned short thresh, unsigned char time,
         else
             data[1] = INV_LPA_40HZ;
         data[1] = (data[1] << 6) | BIT_STBY_XYZG;
-        if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, data))
+        if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 2, data))
             goto lp_int_restore;
 
         st.chip_cfg.int_motion_only = 1;
@@ -2944,12 +2761,12 @@ int mpu_lp_motion_interrupt(unsigned short thresh, unsigned char time,
         data[0] = 0;
         data[1] = 0;
         data[2] = BIT_STBY_XYZG;
-        if (!i2c_write(st.hw->addr, st.reg->user_ctrl, 3, data))
+        if (i2c_write(st.hw->addr, st.reg->user_ctrl, 3, data))
             goto lp_int_restore;
 
         /* Set motion threshold. */
         data[0] = thresh_hw;
-        if (!i2c_write(st.hw->addr, st.reg->motion_thr, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->motion_thr, 1, data))
             goto lp_int_restore;
 
         /* Set wake frequency. */
@@ -2973,22 +2790,22 @@ int mpu_lp_motion_interrupt(unsigned short thresh, unsigned char time,
             data[0] = INV_LPA_320HZ;
         else
             data[0] = INV_LPA_640HZ;
-        if (!i2c_write(st.hw->addr, st.reg->lp_accel_odr, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->lp_accel_odr, 1, data))
             goto lp_int_restore;
 
         /* Enable motion interrupt (MPU6500 version). */
         data[0] = BITS_WOM_EN;
-        if (!i2c_write(st.hw->addr, st.reg->accel_intel, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->accel_intel, 1, data))
             goto lp_int_restore;
 
         /* Enable cycle mode. */
         data[0] = BIT_LPA_CYCLE;
-        if (!i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->pwr_mgmt_1, 1, data))
             goto lp_int_restore;
 
         /* Enable interrupt. */
         data[0] = BIT_MOT_INT_EN;
-        if (!i2c_write(st.hw->addr, st.reg->int_enable, 1, data))
+        if (i2c_write(st.hw->addr, st.reg->int_enable, 1, data))
             goto lp_int_restore;
 
         st.chip_cfg.int_motion_only = 1;
@@ -3027,14 +2844,17 @@ lp_int_restore:
 #ifdef MPU6500
     /* Disable motion interrupt (MPU6500 version). */
     data[0] = 0;
-    if (!i2c_write(st.hw->addr, st.reg->accel_intel, 1, data))
+    if (i2c_write(st.hw->addr, st.reg->accel_intel, 1, data))
         goto lp_int_restore;
 #endif
 
     st.chip_cfg.int_motion_only = 0;
     return 0;
 }
+void myget_ms(unsigned long *time)
+{
 
+}
 /**
  *  @}
  */

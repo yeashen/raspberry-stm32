@@ -1,9 +1,4 @@
-/*
- $License:
-    Copyright (C) 2011-2012 InvenSense Corporation, All Rights Reserved.
-    See included License.txt for License information.
- $
- */
+
 /**
  *  @addtogroup  DRIVERS Sensor Driver Layer
  *  @brief       Hardware drivers to communicate with sensors via I2C.
@@ -21,15 +16,6 @@
 #ifndef _INV_MPU_H_
 #define _INV_MPU_H_
 
-#include "stm32f10x.h"
-
-#define MPU6050
-//#define HMC5883
-#define MOTION_DRIVER_TARGET_STM32F103
-
-#define EMPL_NO_64BIT
-
-#define DEFAULT_MPU_HZ  (100)
 #define INV_X_GYRO      (0x40)
 #define INV_Y_GYRO      (0x20)
 #define INV_Z_GYRO      (0x10)
@@ -65,13 +51,7 @@ struct int_param_s {
 #define MPU_INT_STATUS_DMP_4            (0x1000)
 #define MPU_INT_STATUS_DMP_5            (0x2000)
 
-void run_self_test(void);
- unsigned short inv_orientation_matrix_to_scalar(
-    const signed char *mtx);
- unsigned short inv_row_2_scale(const signed char *row);
-
 /* Set up APIs */
-bool mpu6050_check();
 int mpu_init(void);
 int mpu_init_slave(void);
 int mpu_set_bypass(unsigned char bypass_on);
@@ -137,6 +117,6 @@ int mpu_reg_dump(void);
 int mpu_read_reg(unsigned char reg, unsigned char *data);
 int mpu_run_self_test(long *gyro, long *accel);
 int mpu_register_tap_cb(void (*func)(unsigned char, unsigned char));
-
+void myget_ms(unsigned long *time);
 #endif  /* #ifndef _INV_MPU_H_ */
 

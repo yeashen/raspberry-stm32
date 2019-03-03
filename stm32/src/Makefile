@@ -3,54 +3,31 @@
 include ../Makefile.common
 
 # system
-OBJS += startup.o
-OBJS += sys.o
-OBJS += newlib_stubs.o
-
-# main
-OBJS += main.o
-
-# peripheral
+OBJS += adc.o
+OBJS += control.o
+#OBJS += DataScope_DP.o
 OBJS += delay.o
-
-OBJS += led.o
-#OBJS += adc.o
-#OBJS += dac.o
-#OBJS += DMA.o
-#OBJS += exint.o
-#OBJS += gps.o
-#OBJS += key.o
-
-OBJS += oled.o
-OBJS += pwm.o
-OBJS += motor.o
 OBJS += encoder.o
-#OBJS += spi.o
-#OBJS += standby.o
-OBJS += sw_i2c.o
-#OBJS += hw_i2c.o
-OBJS += timer.o
-OBJS += usart.o
-OBJS += PID_Ctrl.o
-OBJS += pkthandle.o
-OBJS += attitude.o
-OBJS += user_stdlib.o
-
-# mpu6050
-ifeq ($(CONFIG_USE_MPU6050),1)
-ifeq ($(CONFIG_MPU6050_USE_DMP),1)
+OBJS += exti.o
+OBJS += filter.o
 OBJS += inv_mpu.o
 OBJS += inv_mpu_dmp_motion_driver.o
-#OBJS += hmc5883l.o
-else
+OBJS += i2c.o
+OBJS += key.o
+OBJS += led.o
+OBJS += main.o
+OBJS += motor.o
 OBJS += mpu6050.o
-endif
-endif
-
-ifeq ($(CONFIG_USE_USB),1)
-OBJS += $(patsubst %.c,%.o,$(wildcard usb/lib/*.c))
-OBJS += $(patsubst %.c,%.o,$(wildcard usb/config/*.c))
-endif
+OBJS += newlib_stubs.o
+OBJS += oled.o
+OBJS += pkthandle.o
+OBJS += show.o
+OBJS += stmflash.o
+OBJS += sys.o
+OBJS += timer.o
+OBJS += usart.o
+OBJS += usart3.o
+OBJS += startup.o
 
 all: src
 
@@ -62,7 +39,6 @@ app.a: $(OBJS)
 
 clean:
 		rm -f app.a *.o 
-		rm -f usb/lib/*.o usb/config/*.o
 tshow:
 		@echo "######################################################################################################"
 		@echo "################# optimize settings: $(InfoTextLib), $(InfoTextSrc)"

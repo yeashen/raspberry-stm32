@@ -1,24 +1,33 @@
-#ifndef _MOTOR_H
-#define _MOTOR_H
+/******************************************************************************
 
-#include "stm32f10x.h"
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
+  Copyright (C), 2019-2029, DIY Co., Ltd.
 
-enum {
-	LEFT = 0x0,
-	RIGHT,
-};
+ ******************************************************************************
+  File Name     : motor.h
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : motor header
+  Function List :
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
 
-enum {
-	FOREWARD = 0x0,
-	REVERSAL,
-	STOP,
-	BRAKE
-};
+******************************************************************************/
 
-void motor_init(void);
+#ifndef __MOTOR_H
+#define __MOTOR_H
+#include <sys.h>	 
 
-void motor_direction_ctrl(u8 side, u8 dir);
+#define PWMA   TIM1->CCR1  //PA8
+#define AIN2   PBout(15)
+#define AIN1   PBout(14)
+#define BIN1   PBout(13)
+#define BIN2   PBout(12)
+#define PWMB   TIM1->CCR4  //PA11
 
-#endif /* _MOTOR_H */
+void robot_pwm_init(u16 arr,u16 psc);
+
+#endif

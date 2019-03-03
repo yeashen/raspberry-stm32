@@ -1,96 +1,30 @@
-/******************************************************************************
-
-	Copyright (C), 2015-2025, DIY Co., Ltd.
-
- ******************************************************************************
-  File Name     : led.c
-  Version       : Initial Draft
-  Author        : Juven
-  Created       : 2017/06/17
-  Last Modified : 
-  Description   : 
-  History       : 
-  1.Date        : 2017/06/17
-   Author       : Juven
-   Modification : Created file
-
-******************************************************************************/
-
 #include "led.h"
 
-void led_init()
+/**************************************************************************
+函数功能：LED接口初始化
+入口参数：无 
+返回  值：无
+**************************************************************************/
+void led_init(void)
 {
-	/*
-	 * PA3 -> LED_R
-	 * PA5 -> LED_G
-	 * PB0 -> LED_B
-	 */
-	GPIO_InitTypeDef GPIO_InitStructure;
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA|RCC_APB2Periph_GPIOC|RCC_APB2Periph_GPIOB, ENABLE);
-#if 0//!(DEBUG_UART == 2)
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-#endif
-	
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
-	
-#if 0//!(DEBUG_UART == 2)
-	GPIO_SetBits(GPIOA, GPIO_Pin_3);
-#endif
-	GPIO_SetBits(GPIOA, GPIO_Pin_5);
-	GPIO_SetBits(GPIOB, GPIO_Pin_0);
-	GPIO_ResetBits(GPIOC, GPIO_Pin_13);
+	GPIO_InitTypeDef stGpio_Init;
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE); //使能端口时钟
+	stGpio_Init.GPIO_Pin = GPIO_Pin_4;	            //端口配置
+	stGpio_Init.GPIO_Mode = GPIO_Mode_Out_PP;      //推挽输出
+	stGpio_Init.GPIO_Speed = GPIO_Speed_50MHz;     //50M
+	GPIO_Init(GPIOA, &stGpio_Init);				   //根据设定参数初始化GPIOA 
 }
 
-void led_rgb_set(u8 rgb)
+/**************************************************************************
+函数功能：LED闪烁
+入口参数：闪烁频率 
+返回  值：无
+**************************************************************************/
+void led_flash(u16 u16Time)
 {
-	switch(rgb){
-		case LED_RED:
-#if 0//!(DEBUG_UART == 2)
-			GPIO_ResetBits(GPIOA, GPIO_Pin_3);
-#endif
-			GPIO_SetBits(GPIOA, GPIO_Pin_5);
-			GPIO_SetBits(GPIOB, GPIO_Pin_0);
-			break;
-		case LED_GREEN:
-			GPIO_ResetBits(GPIOA, GPIO_Pin_5);
-#if 0//!(DEBUG_UART == 2)
-			GPIO_SetBits(GPIOA, GPIO_Pin_3);
-#endif
-			GPIO_SetBits(GPIOB, GPIO_Pin_0);
-			break;
-		case LED_BLUE:
-			GPIO_ResetBits(GPIOB, GPIO_Pin_0);
-#if 0//!(DEBUG_UART == 2)
-			GPIO_SetBits(GPIOA, GPIO_Pin_3);
-#endif
-			GPIO_SetBits(GPIOA, GPIO_Pin_5);
-			break;
-	}
+	static s32 S32tTemp;
+	if(0 == u16Time) 
+		LED=0;
+	else if(++S32tTemp == u16Time)	
+		LED=~LED,S32tTemp=0;
 }
-
-void led_set(u8 sw)
-{
-	if(sw == LED_OFF){
-		GPIO_ResetBits(GPIOC, GPIO_Pin_13);
-	}else{
-		GPIO_SetBits(GPIOC, GPIO_Pin_13);
-	}
-}
-
-

@@ -1,139 +1,130 @@
 /******************************************************************************
-  File			: key.c
-  Description	: key test
-  Author		: Xiaoming Li
-*******************************************************************************
-  Modify List:
--------------------------------------------------------------------------------
-  2014/8/4 21:00 PM	| Created
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : key.c
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : key functions 
+  Function List :
+              click
+              click_n_double
+              key_init
+              long_press
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
+
 ******************************************************************************/
 
 #include "key.h"
-#include "delay.h"
-#include "usart.h"
-
-struct io_port
-{
-	GPIO_TypeDef *GPIO_x;
-	uint16_t GPIO_pin;
-};
-
-static struct io_port key_input[4] = 
-{
-	{GPIOD, GPIO_Pin_0},
-	{GPIOD, GPIO_Pin_1},
-	{GPIOD, GPIO_Pin_2},
-	{GPIOD, GPIO_Pin_3}
-};
-
-static struct io_port key_output[4] = 
-{
-	{GPIOD, GPIO_Pin_4},
-	{GPIOD, GPIO_Pin_5},
-	{GPIOD, GPIO_Pin_6},
-	{GPIOD, GPIO_Pin_7}
-};
-
-u8 key_table[4][4] = 
-{
-	{LEFT,1,4,7},
-	{0,2,5,8},
-	{RIGHT,3,6,9},
-	{DOWN,UP,POWER_OFF,POWER_UP}
-};
-
-/*-------------------------------------------------------------------
- * FUNC : key_init
- * DESC : key initial
- * PARM : N/A
- * RET	: N/A
- *-----------------------------------------------------------------*/
+/**************************************************************************
+函数功能：按键初始化
+入口参数：无
+返回  值：无 
+**************************************************************************/
 void key_init(void)
 {
-	GPIO_InitTypeDef GPIO_InitStructure;
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC|RCC_APB2Periph_GPIOE, ENABLE);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
-	
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-	GPIO_Init(GPIOE, &GPIO_InitStructure);
-}
-
-/*-------------------------------------------------------------------
- * FUNC : key_scan
- * DESC : key scan press
- * PARM : N/A
- * RET	: res - press key value 
- *-----------------------------------------------------------------*/
-u8 key_scan(void)
+	GPIO_InitTypeDef stGpio_Init;
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE); //使能PA端口时钟
+	stGpio_Init.GPIO_Pin = GPIO_Pin_5;	            //端口配置
+	stGpio_Init.GPIO_Mode = GPIO_Mode_IPU;         //上拉输入
+	GPIO_Init(GPIOA, &stGpio_Init);				  //根据设定参数初始化GPIOA 
+} 
+/**************************************************************************
+函数功能：按键扫描
+入口参数：双击等待时间
+返回  值：按键状态 0：无动作 1：单击 2：双击 
+**************************************************************************/
+u8 click_n_double (u8 u8Time)
 {
-	if(KEY0 == 0||KEY1 == 0){
-		delay_ms(10);
-		if(KEY0 == 0){
-			while(!KEY0);
-			return KEY0_PRESS;
+	static	u8 flag_key,count_key,double_key;	
+	static	u16 count_single,Forever_count;
+	if(KEY==0)  
+		Forever_count++;   //长按标志位未置1
+	else        
+	 	Forever_count=0;
+	if(0==KEY&&0==flag_key)		
+		flag_key=1;	
+	
+	if(0==count_key)
+	{
+		if(flag_key==1) 
+		{
+			double_key++;
+			count_key=1;	
 		}
-		else if(KEY1 == 0){
-			while(!KEY1);
-			return KEY1_PRESS;
+		if(double_key==2) 
+		{
+			double_key=0;
+			count_single=0;
+			return 2;//双击执行的指令
 		}
 	}
+	if(1==KEY)			
+		flag_key=0,count_key=0;
+	
+	if(1==double_key)
+	{
+		count_single++;
+		if(count_single>u8Time&&Forever_count<u8Time)
+		{
+			double_key=0;
+			count_single=0;	
+			return 1;//单击执行的指令
+		}
+		if(Forever_count>u8Time)
+		{
+			double_key=0;
+			count_single=0;	
+		}
+	}	
 	return 0;
 }
-
-/*-------------------------------------------------------------------
- * FUNC : matrix_key_init
- * DESC : matrix key initail, 4x4 key
- * PARM : N/A
- * RET	: N/A
- *-----------------------------------------------------------------*/
-void matrix_key_init(void)
+/**************************************************************************
+函数功能：按键扫描
+入口参数：无
+返回  值：按键状态 0：无动作 1：单击 
+**************************************************************************/
+u8 click(void)
 {
-	GPIO_InitTypeDef GPIO_InitStructure;
-	u8 i;
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
-
-	//PD.0-PD.3 配置为输入
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_2|GPIO_Pin_3;				
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-	GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-	//PD.4-PD.7 配置是输出
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOD, &GPIO_InitStructure);
-
-	for(i = 0; i < 4; i++){
-		GPIO_SetBits(key_output[i].GPIO_x, key_output[i].GPIO_pin);
+	static u8 flag_key=1;//按键按松开标志
+	if(flag_key&&KEY==0)
+	{
+		flag_key=0;
+		return 1;	// 按键按下
 	}
+	else if(1==KEY)			
+		flag_key=1;
+	
+	return 0;//无按键按下
 }
-
-/*-------------------------------------------------------------------
- * FUNC : matrix_key_scan
- * DESC : matrix key scan, 4x4 key
- * PARM : N/A
- * RET	: N/A
- *-----------------------------------------------------------------*/
-u8 matrix_key_scan(void)
+/**************************************************************************
+函数功能：长按检测
+入口参数：无
+返回  值：按键状态 0：无动作 1：长按2s
+**************************************************************************/
+u8 long_press(void)
 {
-	u8 i, j, key_value = NO_PRESS;
-	for(i = 0; i < 4; i++){		//依次置低列电平
-		GPIO_ResetBits(key_output[i].GPIO_x, key_output[i].GPIO_pin);
-		for(j = 0; j < 4; j++){
-			if(GPIO_ReadInputDataBit(key_input[j].GPIO_x, key_input[j].GPIO_pin) == 0){
-				delay_ms(10);	//延时消抖
-				if(GPIO_ReadInputDataBit(key_input[j].GPIO_x, key_input[j].GPIO_pin) == 0){
-					key_value = key_table[i][j];
-					KEY_DEBUG("press key: %d\r\n", key_value);
-					while(GPIO_ReadInputDataBit(key_input[j].GPIO_x, key_input[j].GPIO_pin) == 0);
-					break;
-				}
-			}
-		}
-		GPIO_SetBits(key_output[i].GPIO_x, key_output[i].GPIO_pin);
+	static u16 Long_Press_count,long_press;
+	if(long_press==0&&KEY==0)  
+		Long_Press_count++;   //长按标志位未置1
+	else                       
+		Long_Press_count=0; 
+	
+	if(Long_Press_count>200)		
+	{
+		long_press=1;	
+		Long_Press_count=0;
+		return 1;
+	}				
+	if(long_press==1)     //长按标志位置1
+	{
+		long_press=0;
 	}
-	return key_value;
+	return 0;
 }

@@ -1,24 +1,41 @@
+/******************************************************************************
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : oled.c
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : oled function
+  Function List :
+              OLED_Clear
+              OLED_Display_Off
+              OLED_Display_On
+              OLED_DrawPoint
+              OLED_Init
+              oled_pow
+              OLED_Refresh_Gram
+              OLED_ShowChar
+              OLED_ShowNumber
+              OLED_ShowString
+              OLED_WR_Byte
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
+
+******************************************************************************/
+
 #include "oled.h"
 #include "stdlib.h"
 #include "oledfont.h"  	 
 #include "delay.h"
-//////////////////////////////////////////////////////////////////////////////////	 
-//imodule	
-//////////////////////////////////////////////////////////////////////////////////	
-
-//OLED的显存
-//存放格式如下.
-//[0]0 1 2 3 ... 127	
-//[1]0 1 2 3 ... 127	
-//[2]0 1 2 3 ... 127	
-//[3]0 1 2 3 ... 127	
-//[4]0 1 2 3 ... 127	
-//[5]0 1 2 3 ... 127	
-//[6]0 1 2 3 ... 127	
-//[7]0 1 2 3 ... 127 			   
+#include "stm32f10x_pwr.h"
+#include "stm32f10x_bkp.h"
+   
 u8 OLED_GRAM[128][8];	 
-
-//更新显存到LCD		 
 void OLED_Refresh_Gram(void)
 {
 	u8 i,n;		    
@@ -30,25 +47,8 @@ void OLED_Refresh_Gram(void)
 		for(n=0;n<128;n++)OLED_WR_Byte(OLED_GRAM[n][i],OLED_DATA); 
 	}   
 }
-#if OLED_MODE==1
-//向SSD1306写入一个字节。
-//dat:要写入的数据/命令
-//cmd:数据/命令标志 0,表示命令;1,表示数据;
-void OLED_WR_Byte(u8 dat,u8 cmd)
-{
-	DATAOUT(dat);	    
-	if(cmd)
-	  OLED_RS_Set();
-	else 
-	  OLED_RS_Clr();		   
-	OLED_CS_Clr();
-	OLED_WR_Clr();	 
-	OLED_WR_Set();
-	OLED_CS_Set();	  
-	OLED_RS_Set();	 
-} 	    	    
-#else
-//向SSD1306写入一个字节。
+
+//向OLED写入一个字节。
 //dat:要写入的数据/命令
 //cmd:数据/命令标志 0,表示命令;1,表示数据;
 void OLED_WR_Byte(u8 dat,u8 cmd)
@@ -58,7 +58,6 @@ void OLED_WR_Byte(u8 dat,u8 cmd)
 	  OLED_RS_Set();
 	else 
 	  OLED_RS_Clr();		  
-	OLED_CS_Clr();
 	for(i=0;i<8;i++)
 	{			  
 		OLED_SCLK_Clr();
@@ -69,10 +68,9 @@ void OLED_WR_Byte(u8 dat,u8 cmd)
 		OLED_SCLK_Set();
 		dat<<=1;   
 	}				 		  
-	OLED_CS_Set();
 	OLED_RS_Set();   	  
 } 
-#endif
+
 	  	  
 //开启OLED显示    
 void OLED_Display_On(void)
@@ -109,18 +107,7 @@ void OLED_DrawPoint(u8 x,u8 y,u8 t)
 	if(t)OLED_GRAM[x][pos]|=temp;
 	else OLED_GRAM[x][pos]&=~temp;	    
 }
-//x1,y1,x2,y2 填充区域的对角坐标
-//确保x1<=x2;y1<=y2 0<=x1<=127 0<=y1<=63	 	 
-//dot:0,清空;1,填充	  
-void OLED_Fill(u8 x1,u8 y1,u8 x2,u8 y2,u8 dot)  
-{  
-	u8 x,y;  
-	for(x=x1;x<=x2;x++)
-	{
-		for(y=y1;y<=y2;y++)OLED_DrawPoint(x,y,dot);
-	}													    
-	OLED_Refresh_Gram();//更新显示
-}
+
 //在指定位置显示一个字符,包括部分字符
 //x:0~127
 //y:0~63
@@ -163,7 +150,7 @@ u32 oled_pow(u8 m,u8 n)
 //size:字体大小
 //mode:模式	0,填充模式;1,叠加模式
 //num:数值(0~4294967295);	 		  
-void OLED_ShowNum(u8 x,u8 y,u32 num,u8 len,u8 size)
+void OLED_ShowNumber(u8 x,u8 y,u32 num,u8 len,u8 size)
 {         	
 	u8 t,temp;
 	u8 enshow=0;						   
@@ -194,64 +181,32 @@ void OLED_ShowString(u8 x,u8 y,const u8 *p)
     {       
         if(x>MAX_CHAR_POSX){x=0;y+=16;}
         if(y>MAX_CHAR_POSY){y=x=0;OLED_Clear();}
-        OLED_ShowChar(x,y,*p,16,1);	 
+        OLED_ShowChar(x,y,*p,12,1);	 
         x+=8;
         p++;
     }  
 }	   
-
-//////////////////////图形区域////////////////////////////
-void OLED_DrawHLine(u8 x1, u8 x2, u8 y)
-{
-	u8 x;
-	for(x = x1; x <= x2; x++)
-		OLED_DrawPoint(x, y, 1);
-	OLED_Refresh_Gram();//更新显示
-}
-
-void OLED_DrawVLine(u8 x, u8 y1, u8 y2)
-{
-	u8 y;
-	for(y = y1; y <= y2; y++)
-		OLED_DrawPoint(x, y, 1);
-	OLED_Refresh_Gram();//更新显示
-}
-
-//初始化SSD1306					    
+//初始化OLED					    
 void OLED_Init(void)
 { 	
- 
- 	GPIO_InitTypeDef  GPIO_InitStructure;
- 	
- 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);	
+	GPIO_InitTypeDef stGpio_Init;
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE); //使能PB端口时钟
+	stGpio_Init.GPIO_Pin = GPIO_Pin_3|GPIO_Pin_4|GPIO_Pin_5;//端口配置
+	stGpio_Init.GPIO_Mode = GPIO_Mode_Out_PP;      //推挽输出
+	stGpio_Init.GPIO_Speed = GPIO_Speed_2MHz;     //2M
+	GPIO_Init(GPIOB, &stGpio_Init);					      //根据设定参数初始化GPIO 
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-	GPIO_PinRemapConfig(GPIO_Remap_SWJ_Disable , ENABLE);	
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);//开A口时钟。
+	stGpio_Init.GPIO_Pin =  GPIO_Pin_15;
+	stGpio_Init.GPIO_Speed = GPIO_Speed_2MHz;       //设为输出　
+	stGpio_Init.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_Init(GPIOA, &stGpio_Init);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1|GPIO_Pin_3|GPIO_Pin_4|GPIO_Pin_5;	 
- 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP; 		
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
- 	GPIO_Init(GPIOB, &GPIO_InitStructure);
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP; 		
-	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
-	
- 	GPIO_SetBits(GPIOB,GPIO_Pin_1|GPIO_Pin_3|GPIO_Pin_4|GPIO_Pin_5);
-	GPIO_SetBits(GPIOA,GPIO_Pin_15);
+	PWR_BackupAccessCmd(ENABLE);//允许修改RTC 和后备寄存器
+	RCC_LSEConfig(RCC_LSE_OFF);//关闭外部低速外部时钟信号功能 后，PC13 PC14 PC15 才可以当普通IO用。
+	BKP_TamperPinCmd(DISABLE);//关闭入侵检测功能，也就是 PC13，也可以当普通IO 使用
+	PWR_BackupAccessCmd(DISABLE);//禁止修改后备寄存器
 
- #if OLED_MODE==1
- 
- 	GPIO_InitStructure.GPIO_Pin =0xFF; //PC0~7 OUT推挽输出
- 	GPIO_Init(GPIOC, &GPIO_InitStructure);
- 	GPIO_SetBits(GPIOC,0xFF); //PC0~7输出高
-
- 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15;				 //PG13,14,15 OUT推挽输出
- 	GPIO_Init(GPIOG, &GPIO_InitStructure);
- 	GPIO_SetBits(GPIOG,GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15);						 //PG13,14,15 OUT  输出高
-
- #endif
-  							  
 	OLED_RST_Clr();
 	delay_ms(100);
 	OLED_RST_Set(); 
@@ -287,4 +242,7 @@ void OLED_Init(void)
 	OLED_WR_Byte(0xAF,OLED_CMD); //开启显示	 
 	OLED_Clear();
 }  
+
+
+
 

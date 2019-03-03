@@ -1,243 +1,137 @@
 /******************************************************************************
-  File			: timer.c
-  Description	: timer test
-  Author		: Xiaoming Li
-*******************************************************************************
-  Modify List:
--------------------------------------------------------------------------------
-  2014/8/5 21:00 PM	| Created
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : timer.c
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : timer3 functions
+  Function List :
+              read_distance
+              tim3_cap_init
+              TIM3_IRQHandler
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
+
 ******************************************************************************/
 
 #include "timer.h"
-#include "led.h"
-#include "delay.h"
-#if USE_MPU6050
-#if MPU6050_USE_DMP
-#include "hmc5883l.h"
-#include "inv_mpu.h"
-#include "inv_mpu_dmp_motion_driver.h"
-#else
-#include "mpu6050.h"
-#endif
-#endif
-#include "oled.h"
-#include "value_struct.h"
-#include "attitude.h"
-#include "user_stdlib.h"
-#include "usart.h"
-#include "encoder.h"
 
-static int task1_count = 0;
-static int task2_count = 0;
-static int task3_count = 0;
-static int led_sta = 0;
-
-
-#if USE_MPU6050
-#if defined(GET_XYZ)
-MPUData m_data;	//原始数据
-MPUData f_data;	//滤波后的数据
-Angle quat_angle;
-int16_t m_pitch, m_roll, m_yaw;
-#elif defined(GET_Z)
-int16_t acc_z;
-int16_t rot_z;
-float gyro_z;
-float angle_z;
-int16_t zero_acc = 0;
-int16_t zero_gyro = 0;
-#endif
-
-#define q30  1073741824.0f
-
-#if MPU6050_USE_DMP
-int16_t gyro[3], accel[3];
-unsigned long sensor_timestamp;
-unsigned long sensor_timestamp;
-short sensors;
-unsigned char more;
-long quat[4];
-#else
-static int16_t mpu_temp = 0;
-#endif
-#endif
-
-/*-------------------------------------------------------------------
- * FUNC : timer2_init
- * DESC : timer 2 initial
- * PARM : arr - reload value
- * 		  psc - clock pre
- *		  cmd - 1: enable timer 0: don't enable timer
- * RET	: N/A
- *-----------------------------------------------------------------*/
-void timer1_init(u16 arr, u16 psc, u8 cmd)
-{
-	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
-	NVIC_InitTypeDef NVIC_InitStructure;
+/**************************************************************************
+函数功能：定时器3通道3输入捕获初始化
+入口参数：入口参数：arr：自动重装值  psc：时钟预分频数 
+返回  值：无
+**************************************************************************/
+TIM_ICInitTypeDef  stTim3Ic_Init;
+void tim3_cap_init(u16 arr,u16 psc)	
+{	 
 	
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE); 
+	GPIO_InitTypeDef stGpio_Init;
+	TIM_TimeBaseInitTypeDef  stTimerBase_Init;
+ 	NVIC_InitTypeDef stNvic_Init;
+
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);	//使能TIM3时钟
+ 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);  //使能GPIOB时钟
 	
-	TIM_TimeBaseStructure.TIM_Period = arr;
-	TIM_TimeBaseStructure.TIM_Prescaler = psc;
-	TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0x0;
-	TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
-	TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
+	stGpio_Init.GPIO_Pin  = GPIO_Pin_0; 
+	stGpio_Init.GPIO_Mode = GPIO_Mode_IPD; //PB0 输入  
+	GPIO_Init(GPIOB, &stGpio_Init);
 	
-	TIM_ClearFlag(TIM1, TIM_FLAG_Update);
-	NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;
-	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	NVIC_Init(&NVIC_InitStructure);
+	stGpio_Init.GPIO_Pin  = GPIO_Pin_1;     
+	stGpio_Init.GPIO_Mode = GPIO_Mode_Out_PP;     //PB1输出 
+	stGpio_Init.GPIO_Speed = GPIO_Speed_2MHz;     //2M
+	GPIO_Init(GPIOB, &stGpio_Init);
 	
-	if(cmd)
-		TIM_Cmd(TIM1, ENABLE);
-} 
-#if USE_MPU6050
-void data_handle()
-{
-#if MPU6050_USE_DMP
-	float q0=1.0f,q1=0.0f,q2=0.0f,q3=0.0f;
-	if(sensors & INV_WXYZ_QUAT ){
-		q0 = quat[0] / q30;	
-		q1 = quat[1] / q30;
-		q2 = quat[2] / q30;
-		q3 = quat[3] / q30;
-		//quat_angle.pitch = asin(2 * q1 * q3 - 2 * q0* q2)* 57.3; // pitch
-		quat_angle.roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3; // roll
-		//quat_angle.yaw = atan2(2*(q1*q2 + q0*q3),q0*q0+q1*q1-q2*q2-q3*q3) * 57.3;	//yaw
-		//m_pitch = quat_angle.pitch * 100;
-		m_roll = quat_angle.roll;
-		//m_yaw = quat_angle.yaw * 10;
+	//初始化定时器3 TIM3	 
+	stTimerBase_Init.TIM_Period = arr; //设定计数器自动重装值 
+	stTimerBase_Init.TIM_Prescaler =psc; 	//预分频器   
+	stTimerBase_Init.TIM_ClockDivision = TIM_CKD_DIV1; //设置时钟分割:TDTS = Tck_tim
+	stTimerBase_Init.TIM_CounterMode = TIM_CounterMode_Up;  //TIM向上计数模式
+	TIM_TimeBaseInit(TIM3, &stTimerBase_Init); //根据TIM_TimeBaseInitStruct中指定的参数初始化TIMx的时间基数单位
+  
+	//初始化TIM3输入捕获参数
+	stTim3Ic_Init.TIM_Channel = TIM_Channel_3; //CC1S=03 	选择输入端 IC3映射到TI1上
+	stTim3Ic_Init.TIM_ICPolarity = TIM_ICPolarity_Rising;	//上升沿捕获
+	stTim3Ic_Init.TIM_ICSelection = TIM_ICSelection_DirectTI;
+	stTim3Ic_Init.TIM_ICPrescaler = TIM_ICPSC_DIV1;	 //配置输入分频,不分频 
+	stTim3Ic_Init.TIM_ICFilter = 0x00;//配置输入滤波器 不滤波
+	TIM_ICInit(TIM3, &stTim3Ic_Init);
+	
+	//中断分组初始化
+	stNvic_Init.NVIC_IRQChannel = TIM3_IRQn;  //TIM3中断
+	stNvic_Init.NVIC_IRQChannelPreemptionPriority = 2;  //先占优先级2级
+	stNvic_Init.NVIC_IRQChannelSubPriority = 2;  //从优先级0级
+	stNvic_Init.NVIC_IRQChannelCmd = ENABLE; //IRQ通道被使能
+	NVIC_Init(&stNvic_Init);  //根据NVIC_InitStruct中指定的参数初始化外设NVIC寄存器 	
+	TIM_ITConfig(TIM3,TIM_IT_Update|TIM_IT_CC3,ENABLE);//允许更新中断 ,允许CC3IE捕获中断	
+	TIM_Cmd(TIM3,ENABLE ); 	//使能定时器3
+}
+/**************************************************************************
+函数功能：超声波接收回波函数
+入口参数：无
+返回  值：无
+**************************************************************************/
+u16 TIM3CH3_CAPTURE_STA,TIM3CH3_CAPTURE_VAL;
+void read_distance(void)
+{   
+	PBout(1)=1;
+	delay_us(15);  
+	PBout(1)=0;	
+	if(TIM3CH3_CAPTURE_STA&0X80)//成功捕获到了一次高电平
+	{
+		Distance=TIM3CH3_CAPTURE_STA&0X3F;
+		Distance*=65536;					        //溢出时间总和
+		Distance+=TIM3CH3_CAPTURE_VAL;		//得到总的高电平时间
+		Distance=Distance*170/1000;
+		//	printf("%d \r\n",Distance);
+		TIM3CH3_CAPTURE_STA=0;			//开启下一次捕获
+	}				
+}
+/**************************************************************************
+函数功能：超声波回波脉宽读取中断
+入口参数：无
+返回  值：无
+作    者：平衡小车之家
+**************************************************************************/
+void TIM3_IRQHandler(void)
+{ 		    		  			    
+	u16 tsr;
+	tsr=TIM3->SR;
+	if((TIM3CH3_CAPTURE_STA&0X80)==0)//还未成功捕获	
+	{
+		if(tsr&0X01)//溢出
+		{	    
+			if(TIM3CH3_CAPTURE_STA&0X40)//已经捕获到高电平了
+			{
+				if((TIM3CH3_CAPTURE_STA&0X3F)==0X3F)//高电平太长了
+				{
+					TIM3CH3_CAPTURE_STA|=0X80;//标记成功捕获了一次
+					TIM3CH3_CAPTURE_VAL=0XFFFF;
+				}else 
+					TIM3CH3_CAPTURE_STA++;
+			}	 
+		}
+		if(tsr&0x08)//捕获3发生捕获事件
+		{	
+			if(TIM3CH3_CAPTURE_STA&0X40)		//捕获到一个下降沿 		
+			{	  			
+				TIM3CH3_CAPTURE_STA|=0X80;		//标记成功捕获到一次高电平脉宽
+				TIM3CH3_CAPTURE_VAL=TIM3->CCR3;	//获取当前的捕获值.
+				TIM3->CCER&=~(1<<9);			//CC1P=0 设置为上升沿捕获
+			}else  								//还未开始,第一次捕获上升沿
+			{
+				TIM3CH3_CAPTURE_STA=0;			//清空
+				TIM3CH3_CAPTURE_VAL=0;
+				TIM3CH3_CAPTURE_STA|=0X40;		//标记捕获到了上升沿
+				TIM3->CNT=0;					//计数器清空
+				TIM3->CCER|=1<<9; 				//CC1P=1 设置为下降沿捕获
+			}		    
+		}			     	    					   
 	}
-#else
-#if defined(GET_XYZ)
-	m_pitch = quat_angle.pitch * 100;
-	m_roll = quat_angle.roll * 100;
-	m_yaw = quat_angle.yaw * 10;
-#elif defined(GET_Z)
-	/* acc range 2g, rate 16384 LSB/g */
-	angle_z = (acc_z - zero_acc) / 16384;
-	angle_z = angle_z*1.2*180/3.14;
-	/* gyro rane 500deg/s reate 65.5 LSB/(deg/s) */
-	gyro_z = (rot_z - zero_gyro)/65.5;
-#endif
-#endif
+	TIM3->SR=0;//清除中断标志位 	     
 }
-
-void data_display()
-{
-	char buf[128];
-
-	OLED_Clear();
-
-	OLED_ShowString(0, 0, (u8 *)"a:");
-	
-	itoa(m_roll, buf, 10);
-	OLED_ShowString(24, 0, (u8 *)buf);  
-	OLED_Refresh_Gram();
-}
-#endif
-
-void TIM1_UP_IRQHandler(void)
-{
-	int ret = 0;
-	task1_count++;
-	task2_count++;
-	task3_count++;
-	if(TIM_GetITStatus(TIM1, TIM_IT_Update) != RESET){
-		
-		//10ms 定时任务
-		if(task1_count == 10){	
-#if USE_MPU6050
-	#if MPU6050_USE_DMP
-			ret = dmp_read_fifo(gyro, accel, quat, &sensor_timestamp, &sensors, &more);
-			if(ret < 0)
-				goto retry;
-	#else
-		#if defined(GET_XYZ)
-			mpu6050_getMotion6(&m_data.m_accel.x, &m_data.m_accel.y, &m_data.m_accel.z, \
-				&m_data.m_gyro.x, &m_data.m_gyro.y, &m_data.m_gyro.z);
-			data_filter(&m_data, &f_data);
-			IMUupdate(&f_data, &quat_angle);
-		#elif defined(GET_Z)
-			acc_z =  mpu6050_getAccelerationZ();
-			rot_z =  mpu6050_getRotationZ();
-		#endif
-			mpu_temp = mpu6050_getTemperature();
-	#endif
-
-			data_handle();
-			
-			//data_display();
-#endif
-retry:	
-			task1_count = 0;
-		}
-		//100ms 定时任务
-		if(task2_count == 100){
-			if(led_sta){
-				led_set(LED_ON);
-				led_sta = 0;
-			}else{
-				led_set(LED_OFF);
-				led_sta = 1;
-			}
-#if USE_MPU6050
-#if defined(GET_Z)
-			//printf("acc=%d, rot=%d, angle=%d, gyro=%d temp=%d\r\n", acc_z, rot_z, angle_z, gyro_z, mpu_temp);	
-#elif defined(GET_XYZ)
-			printf("angle=%d\r\n", m_roll);
-#endif
-			data_display();
-#endif
-			task2_count = 0;
-		}
-		//1s task
-		if(task3_count == 1000){
-			Printf_encoder(Printf_TIMCNT);
-			task3_count = 0;
-		}
-		TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
-	}
-}
-#if 0
-void timer2_encoder_init()
-{
-    GPIO_InitTypeDef GPIO_InitStructure;
-    TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-    TIM_ICInitTypeDef TIM_ICInitStructure;      
-
-    //PA0: ch1  PA1: ch2  
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM2 | RCC_APB2Periph_GPIOB, ENABLE);
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;         
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);                           
-
-
-    TIM_DeInit(TIM2);
-    TIM_TimeBaseStructure.TIM_Period = 359*4;  //设定计数器重装值   TIMx_ARR = 359*4
-    TIM_TimeBaseStructure.TIM_Prescaler = 0; //TIM3时钟预分频值
-    TIM_TimeBaseStructure.TIM_ClockDivision =TIM_CKD_DIV1 ;//设置时钟分割 T_dts = T_ck_int    
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up; //TIM向上计数 
-    TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStructure);              
-
-    TIM_EncoderInterfaceConfig(TIM4, TIM_EncoderMode_TI12, TIM_ICPolarity_BothEdge ,TIM_ICPolarity_BothEdge);//使用编码器模式3，上升下降都计数
-    TIM_ICStructInit(&TIM_ICInitStructure);//将结构体中的内容缺省输入
-    TIM_ICInitStructure.TIM_ICFilter = 6;  //选择输入比较滤波器 
-    TIM_ICInit(TIM4, &TIM_ICInitStructure);//将TIM_ICInitStructure中的指定参数初始化TIM3
-
-//  TIM_ARRPreloadConfig(TIM4, ENABLE);//使能预装载
-    TIM_ClearFlag(TIM4, TIM_FLAG_Update);//清除TIM3的更新标志位
-    TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);//运行更新中断
-    //Reset counter
-    TIM4->CNT = 0;//
-
-    TIM_Cmd(TIM4, ENABLE);   //启动TIM4定时器
-
-}
-#endif

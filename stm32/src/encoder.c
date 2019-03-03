@@ -1,351 +1,135 @@
-/******************** (C) COPYRIGHT 2007 STMicroelectronics ********************
-* File Name          : stm32f10x_encoder.c 
-* Author             : IMS Systems Lab  
-* Date First Issued  : 21/11/07
-* Description        : This file contains the software implementation for the
-*                      encoder unit
-********************************************************************************
-* History:
-* 21/11/07 v1.0
-********************************************************************************
-* THE PRESENT SOFTWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
-* WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE TIME.
-* AS A RESULT, STMICROELECTRONICS SHALL NOT BE HELD LIABLE FOR ANY DIRECT,
-* INDIRECT OR CONSEQUENTIAL DAMAGES WITH RESPECT TO ANY CLAIMS ARISING FROM THE
-* CONTENT OF SUCH SOFTWARE AND/OR THE USE MADE BY CUSTOMERS OF THE CODING
-* INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
-*******************************************************************************/
-/* Includes ------------------------------------------------------------------*/
-#include "stm32f10x.h"
-#include "stm32f10x_tim.h"
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
-#include "misc.h"
+/******************************************************************************
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : encoder.c
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : encoder speed
+  Function List :
+              encoder_init_tim2
+              encoder_init_tim4
+              read_encoder
+              TIM2_IRQHandler
+              TIM4_IRQHandler
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
+
+******************************************************************************/
 
 #include "encoder.h"
-#include "usart.h"
-//#include "lcd.h"
 
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-#define ENCODER_TIMER                TIM3  // Encoder unit connected to TIM3
-#define ENCODER_PPR           (u16)(506)   // number of pulses per revolution
-#define SPEED_BUFFER_SIZE               8
-
-#define COUNTER_RESET   (u16)0
-#define ICx_FILTER      (u8) 6 // 6<-> 670nsec
-
-#define TIMx_PRE_EMPTION_PRIORITY 0
-#define TIMx_SUB_PRIORITY 3
-
-#define SPEED_SAMPLING_FREQ (u16)(2000/(SPEED_SAMPLING_TIME+1))
-
-/* Private functions ---------------------------------------------------------*/
-s16 ENC_Calc_Rot_Speed(void);
-
-/* Private variables ---------------------------------------------------------*/
-static s16 hPrevious_angle, hSpeed_Buffer[SPEED_BUFFER_SIZE], hRot_Speed;
-static u8 bSpeed_Buffer_Index = 0;
-static volatile u16 hEncoder_Timer_Overflow; 
-static bool bIs_First_Measurement = TRUE;
-
-/*******************************************************************************
-* Function Name  : ENC_Init
-* Description    : General Purpose Timer x set-up for encoder speed/position 
-*                  sensors
-* Input          : None
-* Output         : None
-* Return         : None
-*******************************************************************************/
-void Encoder_Init(void)
+/**************************************************************************
+函数功能：把TIM2初始化为编码器接口模式
+入口参数：无
+返回  值：无
+**************************************************************************/
+void encoder_init_tim2(void)
 {
-  TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-  TIM_ICInitTypeDef TIM_ICInitStructure;
-  
-/* Encoder unit connected to TIM3, 4X mode */    
-  GPIO_InitTypeDef GPIO_InitStructure;
-  NVIC_InitTypeDef NVIC_InitStructure;
-  
-  /* TIM3 clock source enable */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-  /* Enable GPIOA, clock */
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
-  
-  GPIO_StructInit(&GPIO_InitStructure);
-  /* Configure PA.06,07 as encoder input */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(GPIOA, &GPIO_InitStructure);
-  
-  /* Enable the TIM3 Update Interrupt */
-  NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
-  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = TIMx_PRE_EMPTION_PRIORITY;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = TIMx_SUB_PRIORITY;
-  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);
+	TIM_TimeBaseInitTypeDef stTimerBase_Init;  
+	TIM_ICInitTypeDef stTimerIc_Init;  
+	GPIO_InitTypeDef stGpio_Init;
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);//使能定时器4的时钟
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);//使能PB端口时钟
 
-  /* Timer configuration in Encoder mode */
-  TIM_DeInit(ENCODER_TIMER);
-  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-  
-  TIM_TimeBaseStructure.TIM_Prescaler = 0x0;  // No prescaling 
-  TIM_TimeBaseStructure.TIM_Period = (4*ENCODER_PPR);  
-  TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;   
-  TIM_TimeBaseInit(ENCODER_TIMER, &TIM_TimeBaseStructure);
- 
-  //TIM_EncoderInterfaceConfig(ENCODER_TIMER, TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);
-  TIM_EncoderInterfaceConfig(ENCODER_TIMER, TIM_EncoderMode_TI12, TIM_ICPolarity_BothEdge, TIM_ICPolarity_BothEdge);
-  TIM_ICStructInit(&TIM_ICInitStructure);
-  TIM_ICInitStructure.TIM_ICFilter = ICx_FILTER;
-  TIM_ICInit(ENCODER_TIMER, &TIM_ICInitStructure);
-  
- // Clear all pending interrupts
-  TIM_ClearFlag(ENCODER_TIMER, TIM_FLAG_Update);
-  TIM_ITConfig(ENCODER_TIMER, TIM_IT_Update, ENABLE);
-  //Reset counter
-  ENCODER_TIMER->CNT = COUNTER_RESET;
-  
-  ENC_Clear_Speed_Buffer();
-  
-  TIM_Cmd(ENCODER_TIMER, ENABLE);  
+	stGpio_Init.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1;	//端口配置
+	stGpio_Init.GPIO_Mode = GPIO_Mode_IN_FLOATING; //浮空输入
+	GPIO_Init(GPIOA, &stGpio_Init);					      //根据设定参数初始化GPIOB
+
+	TIM_TimeBaseStructInit(&stTimerBase_Init);
+	stTimerBase_Init.TIM_Prescaler = 0x0; // 预分频器 
+	stTimerBase_Init.TIM_Period = ENCODER_TIM_PERIOD; //设定计数器自动重装值
+	stTimerBase_Init.TIM_ClockDivision = TIM_CKD_DIV1;//选择时钟分频：不分频
+	stTimerBase_Init.TIM_CounterMode = TIM_CounterMode_Up;////TIM向上计数  
+	TIM_TimeBaseInit(TIM2, &stTimerBase_Init);
+	TIM_EncoderInterfaceConfig(TIM2, TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);//使用编码器模式3
+	TIM_ICStructInit(&stTimerIc_Init);
+	stTimerIc_Init.TIM_ICFilter = 10;
+	TIM_ICInit(TIM2, &stTimerIc_Init);
+	TIM_ClearFlag(TIM2, TIM_FLAG_Update);//清除TIM的更新标志位
+	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+	//Reset counter
+	TIM_SetCounter(TIM2,0);
+	TIM_Cmd(TIM2, ENABLE); 
 }
-
-/*******************************************************************************
-* Function Name  : ENC_Get_Electrical_Angle
-* Description    : Returns the absolute electrical Rotor angle 
-* Input          : None
-* Output         : None
-* Return         : Rotor electrical angle: 0 -> 0 degrees, 
-*                                          S16_MAX-> 180 degrees, 
-*                                          S16_MIN-> -180 degrees                  
-*******************************************************************************/
-s16 ENC_Get_Electrical_Angle(void)
+/**************************************************************************
+函数功能：把TIM4初始化为编码器接口模式
+入口参数：无
+返回  值：无
+**************************************************************************/
+void encoder_init_tim4(void)
 {
-  s32 temp;
-  
-  temp = (s32)(TIM_GetCounter(ENCODER_TIMER)) * (s32)(U32_MAX / (4*ENCODER_PPR)); 
-  return((s16)(temp/65536)); // s16 result
+	TIM_TimeBaseInitTypeDef stTimerBase_Init;  
+	TIM_ICInitTypeDef stTimerIc_Init;  
+	GPIO_InitTypeDef stGpio_Init;
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);//使能定时器4的时钟
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);//使能PB端口时钟
+
+	stGpio_Init.GPIO_Pin = GPIO_Pin_6|GPIO_Pin_7;	//端口配置
+	stGpio_Init.GPIO_Mode = GPIO_Mode_IN_FLOATING; //浮空输入
+	GPIO_Init(GPIOB, &stGpio_Init);					      //根据设定参数初始化GPIOB
+
+	TIM_TimeBaseStructInit(&stTimerBase_Init);
+	stTimerBase_Init.TIM_Prescaler = 0x0; // 预分频器 
+	stTimerBase_Init.TIM_Period = ENCODER_TIM_PERIOD; //设定计数器自动重装值
+	stTimerBase_Init.TIM_ClockDivision = TIM_CKD_DIV1;//选择时钟分频：不分频
+	stTimerBase_Init.TIM_CounterMode = TIM_CounterMode_Up;////TIM向上计数  
+	TIM_TimeBaseInit(TIM4, &stTimerBase_Init);
+	TIM_EncoderInterfaceConfig(TIM4, TIM_EncoderMode_TI12, TIM_ICPolarity_Rising, TIM_ICPolarity_Rising);//使用编码器模式3
+	TIM_ICStructInit(&stTimerIc_Init);
+	stTimerIc_Init.TIM_ICFilter = 10;
+	TIM_ICInit(TIM4, &stTimerIc_Init);
+	TIM_ClearFlag(TIM4, TIM_FLAG_Update);//清除TIM的更新标志位
+	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+	//Reset counter
+	TIM_SetCounter(TIM4,0);
+	TIM_Cmd(TIM4, ENABLE); 
 }
 
-/*******************************************************************************
-* Function Name  : ENC_Clear_Speed_Buffer
-* Description    : Clear speed buffer used for average speed calculation  
-* Input          : None
-* Output         : None
-* Return         : None
-*******************************************************************************/
-void ENC_Clear_Speed_Buffer(void)
-{   
-  u32 i;
-
-  for (i=0;i<SPEED_BUFFER_SIZE;i++)
-  {
-    hSpeed_Buffer[i] = 0;
-  }
-  bIs_First_Measurement = TRUE;
-}
-
-/*******************************************************************************
-* Function Name  : ENC_Calc_Rot_Speed
-* Description    : Compute return latest speed measurement 
-* Input          : None
-* Output         : s16
-* Return         : Return the speed in 0.1 Hz resolution.                    
-*******************************************************************************/
-s16 ENC_Calc_Rot_Speed(void)
-{   
-  s32 wDelta_angle;
-  u16 hEnc_Timer_Overflow_sample_one, hEnc_Timer_Overflow_sample_two;
-  u16 hCurrent_angle_sample_one, hCurrent_angle_sample_two;
-  //signed long long temp;
-  signed long temp;
-  s16 haux;
-  
-  if (!bIs_First_Measurement)
-  {
-    // 1st reading of overflow counter    
-    hEnc_Timer_Overflow_sample_one = hEncoder_Timer_Overflow; 
-    // 1st reading of encoder timer counter
-    hCurrent_angle_sample_one = ENCODER_TIMER->CNT;
-    // 2nd reading of overflow counter
-    hEnc_Timer_Overflow_sample_two = hEncoder_Timer_Overflow;  
-    // 2nd reading of encoder timer counter
-    hCurrent_angle_sample_two = ENCODER_TIMER->CNT;      
-
-    // Reset hEncoder_Timer_Overflow and read the counter value for the next
-    // measurement
-    hEncoder_Timer_Overflow = 0;
-    haux = ENCODER_TIMER->CNT;   
-    
-    if (hEncoder_Timer_Overflow != 0) 
-    {
-      haux = ENCODER_TIMER->CNT; 
-      hEncoder_Timer_Overflow = 0;            
-    }
-     
-    if (hEnc_Timer_Overflow_sample_one != hEnc_Timer_Overflow_sample_two)
-    { //Compare sample 1 & 2 and check if an overflow has been generated right 
-      //after the reading of encoder timer. If yes, copy sample 2 result in 
-      //sample 1 for next process 
-      hCurrent_angle_sample_one = hCurrent_angle_sample_two;
-      hEnc_Timer_Overflow_sample_one = hEnc_Timer_Overflow_sample_two;
-    }
-    
-    if ( (ENCODER_TIMER->CR1 & TIM_CounterMode_Down) == TIM_CounterMode_Down)  
-    {// encoder timer down-counting
-      wDelta_angle = (s32)(hCurrent_angle_sample_one - hPrevious_angle - 
-                    (hEnc_Timer_Overflow_sample_one) * (4*ENCODER_PPR));
-    }
-    else  
-    {//encoder timer up-counting
-      wDelta_angle = (s32)(hCurrent_angle_sample_one - hPrevious_angle + 
-                    (hEnc_Timer_Overflow_sample_one) * (4*ENCODER_PPR));
-    }
-    
-    // speed computation as delta angle * 1/(speed sempling time)
-    //temp = (signed long long)(wDelta_angle * SPEED_SAMPLING_FREQ);
-    temp = (signed long)(wDelta_angle * SPEED_SAMPLING_FREQ);
-    temp *= 10;  // 0.1 Hz resolution
-    temp /= (4*ENCODER_PPR);
-        
-  } //is first measurement, discard it
-  else
-  {
-    bIs_First_Measurement = FALSE;
-    temp = 0;
-    hEncoder_Timer_Overflow = 0;
-    haux = ENCODER_TIMER->CNT;       
-    // Check if Encoder_Timer_Overflow is still zero. In case an overflow IT 
-    // occured it resets overflow counter and wPWM_Counter_Angular_Velocity
-    if (hEncoder_Timer_Overflow != 0) 
-    {
-      haux = ENCODER_TIMER->CNT; 
-      hEncoder_Timer_Overflow = 0;            
-    }
-  }
-  
-  hPrevious_angle = haux;  
- 
-  return((s16) temp);
-}
-
-/*******************************************************************************
-* Function Name  : ENC_Calc_Average_Speed
-* Description    : Compute smoothed motor speed based on last SPEED_BUFFER_SIZE
-                   informations and store it variable  
-* Input          : None
-* Output         : s16
-* Return         : Return rotor speed in 0.1 Hz resolution. This routine 
-                   will return the average mechanical speed of the motor.
-*******************************************************************************/
-void ENC_Calc_Average_Speed(void)
-{   
-  s32 wtemp;
-  u32 i;
-  
-  wtemp = ENC_Calc_Rot_Speed();
-        
-/* Compute the average of the read speeds */  
-  hSpeed_Buffer[bSpeed_Buffer_Index] = (s16)wtemp;
-  bSpeed_Buffer_Index++;
-  
-  if (bSpeed_Buffer_Index == SPEED_BUFFER_SIZE) 
-  {
-    bSpeed_Buffer_Index = 0;
-  }
-
-  wtemp=0;
-
-  for (i=0;i<SPEED_BUFFER_SIZE;i++)
-  {
-    wtemp += hSpeed_Buffer[i];
-  }
-  wtemp /= SPEED_BUFFER_SIZE;
-  
-  hRot_Speed = ((s16)(wtemp));
-}
-
-/*******************************************************************************
-* Function Name  : Printf_encode
-* Description    : This function handles the Printf of timer counter, theta and
-                    electronical frequency:
-                    theta --- resolution: 1 degree;
-                    electronical frequency --- resolution: 0.1Hz.
-* Input          : None
-* Output         : None
-* Return         : None
-*******************************************************************************/
-//官方给的不是这个函数 这个是被我修改过的了
-void Printf_encoder(PrintfType PrintfStatus)
+/**************************************************************************
+函数功能：单位时间读取编码器计数
+入口参数：定时器
+返回  值：速度值
+**************************************************************************/
+int read_encoder(u8 TIMX)
 {
-  u16 hValue;
-  s16 Theta;
-  s16 hSpeed;
-  //char *pstr;
-  
-  switch (PrintfStatus)
-  {
-    case Printf_TIMCNT: 
-		hValue = TIM_GetCounter(ENCODER_TIMER);
-		//write_string(int2char(hValue)); 
-		printf("N=%u\r\n",hValue);     
-		break;    
-    case Printf_THETA:      
-		Theta = ENC_Get_Electrical_Angle()*360/U16_MAX;
-		if (Theta < 0) 
-		{
-			hValue = (u16)(-Theta);
-			//pstr = int2char(hValue);
-			//*pstr = '-';
-			printf("C=-%04u\r\n",hValue);
-		}
-		else
-		{
-			hValue = (u16)Theta;
-			//pstr = int2char(hValue);
-			//if (hValue != 0) *pstr = '+'; 
-			printf("C=+%04u\r\n",hValue); 
-		}
-		//write_string(pstr);
-    	break;    
-    default:
-		hSpeed = hRot_Speed;
-		if (hSpeed < 0) 
-		{
-			hValue = (u16)(-hSpeed);
-			//pstr = int2char(hValue);
-			//*pstr = '-';
-			printf("S=-%04u\r\n",hValue);
-		}
-		else
-		{
-			hValue = (u16)hSpeed;
-			//pstr = int2char(hValue);
-			//if (hValue != 0) *pstr = '+';
-			printf("S=+%04u\r\n",hValue);  
-		}
-		//write_string(pstr);
-    	break;
-  }
-}
-
-/*******************************************************************************
-* Function Name  : TIM2_IRQHandler
-* Description    : This function handles TIMx Update interrupt request.
-                   Encoder unit connected to TIM2
-* Input          : None
-* Output         : None
-* Return         : None
-*******************************************************************************/
-void TIM3_IRQHandler(void)
-{  
-	/* Clear the interrupt pending flag */
-	TIM_ClearFlag(ENCODER_TIMER, TIM_FLAG_Update);
-	if (hEncoder_Timer_Overflow != U16_MAX)  
+	int Encoder_TIM;    
+	switch(TIMX)
 	{
-		hEncoder_Timer_Overflow++;
+		case 2:  Encoder_TIM= (short)TIM2 -> CNT;  TIM2 -> CNT=0;break;
+		case 3:  Encoder_TIM= (short)TIM3 -> CNT;  TIM3 -> CNT=0;break;	
+		case 4:  Encoder_TIM= (short)TIM4 -> CNT;  TIM4 -> CNT=0;break;	
+		default:  Encoder_TIM=0;
 	}
+	return Encoder_TIM;
+}
+/**************************************************************************
+函数功能：TIM4中断服务函数
+入口参数：无
+返回  值：无
+**************************************************************************/
+void TIM4_IRQHandler(void)
+{ 		    		  			    
+	if(TIM4->SR&0X0001)//溢出中断
+	{    				   				     	    	
+	}				   
+	TIM4->SR&=~(1<<0);//清除中断标志位 	    
+}
+/**************************************************************************
+函数功能：TIM2中断服务函数
+入口参数：无
+返回  值：无
+**************************************************************************/
+void TIM2_IRQHandler(void)
+{ 		    		  			    
+	if(TIM2->SR&0X0001)//溢出中断
+	{    				   				     	    	
+	}				   
+	TIM2->SR&=~(1<<0);//清除中断标志位 	    
 }
 
-/******************* (C) COPYRIGHT 2007 STMicroelectronics *****END OF FILE****/

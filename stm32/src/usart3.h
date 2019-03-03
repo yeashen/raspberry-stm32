@@ -3,12 +3,12 @@
   Copyright (C), 2019-2029, DIY Co., Ltd.
 
  ******************************************************************************
-  File Name     : adc.h
+  File Name     : usart3.h
   Version       : Initial Draft
   Author        : Juven
   Created       : 2019/2/26
   Last Modified :
-  Description   : adc header
+  Description   : uart3 header
   Function List :
   History       :
   1.Date        : 2019/2/26
@@ -17,36 +17,13 @@
 
 ******************************************************************************/
 
-#ifndef __ADC_H
-#define __ADC_H	
-#include "stm32f10x.h" 
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
-#include "stm32f10x_adc.h"
+#ifndef __USRAT3_H
+#define __USRAT3_H 
+#include "sys.h"	  	
 
-#include "sys.h"
+void uart3_init(u32 bound);
 
-#define Battery_Ch 6
+void USART3_IRQHandler(void);
 
-void adc_init(void);
-
-u16 get_adc(u8 ch);
-
-int get_battery_volt(void);   
-
-#endif 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#endif
 

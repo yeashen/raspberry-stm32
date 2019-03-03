@@ -1,3 +1,22 @@
+/******************************************************************************
+
+  Copyright (C), 2019-2029, DIY Co., Ltd.
+
+ ******************************************************************************
+  File Name     : pkthandle.h
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/28
+  Last Modified :
+  Description   : pakage hadle header
+  Function List :
+  History       :
+  1.Date        : 2019/2/28
+    Author      : Juven
+    Modification: Created file
+
+******************************************************************************/
+
 #ifndef _PKTHANDLE_H
 #define _PKTHANDLE_H
 
@@ -36,21 +55,26 @@ typedef enum{
 /* get system device information */
 #define CMD_GET_SYS_INFO		0x01
 
-/* set motor direction,  param[0]: left/right, param[1]: direction*/
-#define CMD_SET_MOTOR_DIR		0x02
+/* set go forward,  param[0]: speed low 8bit, param[1]: speed high 8bit*/
+#define CMD_SET_FORWARD		0x02
 
-/* get motor direction, no param */
-#define CMD_GET_MOTOR_DIR		0x03
+/* set go back,  param[0]: speed low 8bit, param[1]: speed high 8bit*/
+#define CMD_SET_GOBACK		0x03
 
-/* set motor speed, param[0]: pwm0 lsb, param[1]: pwm0 msb
- * param[2]: pwm1 lsb, param[3]: pwm1 msb
- * */
-#define CMD_SET_MOTOR_SPEED		0x04
+/* set brake */
+#define CMD_SET_BRAKE		0x04
 
-/* get motor speed, no param */
-#define CMD_GET_MOTOR_SPEED		0x05
+/* turn left */
+#define CMD_SET_TURN_LEFT 	0x05
 
-#define PKG_PDEBUG
+/* turn right */
+#define CMD_SET_TURN_RIGHT 	0x06
+
+#define SYS_INFO_DATA_LEN	(20)
+
+#define CMD_SPEED_DATA_LEN	(2)
+
+//#define PKG_PDEBUG
 #ifdef PKG_PDEBUG
 #define PKG_DEBUG(string,args...)	printf("[PKG_DEBUG] ");	\
 									printf(string, ##args)

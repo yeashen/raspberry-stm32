@@ -1,25 +1,33 @@
-#ifndef _LED_H
-#define _LED_H
+/******************************************************************************
 
-#include "stm32f10x.h"
-#include "stm32f10x_rcc.h"
-#include "stm32f10x_gpio.h"
+  Copyright (C), 2019-2029, DIY Co., Ltd.
 
-enum {
-	LED_RED = 0x0,
-	LED_GREEN,
-	LED_BLUE,
-};
+ ******************************************************************************
+  File Name     : led.h
+  Version       : Initial Draft
+  Author        : Juven
+  Created       : 2019/2/26
+  Last Modified :
+  Description   : led header
+  Function List :
+  History       :
+  1.Date        : 2019/2/26
+    Author      : Juven
+    Modification: Created file
 
-enum {
-	LED_OFF = 0x0,
-	LED_ON,
-};
+******************************************************************************/
 
-void led_init(void);
+#ifndef __LED_H
+#define __LED_H
 
-void led_rgb_set(u8 rgb);
+#include "sys.h"
 
-void led_set(u8 sw);
+//LED 端口定义
 
-#endif /* _LED_H */
+#define LED PAout(4)  
+
+void led_init(void);  //初始化
+
+void led_flash(u16 time);
+
+#endif

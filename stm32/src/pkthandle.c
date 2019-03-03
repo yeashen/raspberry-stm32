@@ -18,14 +18,9 @@
 
 #include "usart.h"
 #include "pkthandle.h" 
-#include "led.h"
-#include "motor.h"
-#include "pwm.h"
+#include "sys.h"
 
 /* global value define */
-static u8 left_dir = STOP;
-static u8 right_dir = STOP;
-static Motor_PWM pwm;
 
 /*
   *  type: 0 --check packet checksum;		1 --generate packet checksum
@@ -67,11 +62,9 @@ void packet_send(uart_pkt_s *pkt)
 	pkt->params[len+1] = (pkt->checksum & 0xFF00)>>8;
 	
 	/* send packet */
-#if (DEBUG_UART == 1)
-	uart2_send((u8 *)pkt, 6+len);
-#elif (DEBUG_UART == 2)
+
 	uart1_send((u8 *)pkt, 6+len);
-#endif
+
 }
 
 int packet_handle(uart_pkt_s *pkt)
@@ -80,6 +73,7 @@ int packet_handle(uart_pkt_s *pkt)
 	u8 reg;
 	u8 param[UART_PKT_LEN];
 	uart_pkt_s *pkts = pkt;
+	int tmp;
 
 	if(NULL == pkt){
 		ret = -1;
@@ -100,25 +94,40 @@ int packet_handle(uart_pkt_s *pkt)
 		}
 		switch(reg){
 			case CMD_SET_SYS_STAT:		/*system status*/
-				led_set(param[0]);
 				PKG_DEBUG("CMD_SET_SYS_STAT : param[0]=0x%x\r\n", param[0]);
 				break;
-			case CMD_SET_MOTOR_DIR:		/* motor direction */
-				motor_direction_ctrl(param[0], param[1]);
-				if(param[0] == LEFT){
-					left_dir = param[1];
-				}else{
-					right_dir = param[1];
-				}
-				PKG_DEBUG("CMD_SET_MOTOR_DIR : param[0]=0x%x, param[1]=0x%x\r\n", 
-						param[0], param[1]);
+			case CMD_SET_FORWARD:		/* go forward */
+				Flag_Qian = 1;
+				Flag_Hou = 0;
+				line_velocity = param[0]|(param[1]<<8);
+				PKG_DEBUG("CMD_SET_FORWARD : param[0]=0x%x param[1]=0x%x \r\n", param[0], param[1]);
 				break;
-			case CMD_SET_MOTOR_SPEED:	/* motor speed */
-				pwm.pwm1 = param[0]|(param[1]<<8);
-				pwm.pwm2 = param[2]|(param[3]<<8);
-				TIMER4_PWM_Refresh(&pwm);
-				PKG_DEBUG("CMD_SET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x, param[2]=0x%x, param[3]=0x%x\r\n",
-						param[0], param[1], param[2], param[3]);
+			case CMD_SET_GOBACK:	/* go back */
+				Flag_Qian = 0;
+				Flag_Hou = 1;
+				line_velocity = param[0]|(param[1]<<8);
+				PKG_DEBUG("CMD_SET_GOBACK : param[0]=0x%x param[1]=0x%x \r\n", param[0], param[1]);
+				break;
+			case CMD_SET_TURN_LEFT:		/* turn left */
+				Flag_Left = 1;
+				Flag_Right= 0;
+				turn_velocity = param[0]|(param[1]<<8);
+				PKG_DEBUG("CMD_SET_TURN_LEFT : param[0]=0x%x param[1]=0x%x \r\n\r\n", param[0], param[1]);
+				break;
+			case CMD_SET_TURN_RIGHT:		/* turn right*/
+				Flag_Left = 0;
+				Flag_Right= 1;
+				turn_velocity = param[0]|(param[1]<<8);
+				PKG_DEBUG("CMD_SET_TURN_RIGHT : param[0]=0x%x param[1]=0x%x \r\n\r\n", param[0], param[1]);
+				break;
+			case CMD_SET_BRAKE:		/* brake */
+				Flag_Qian = 0;
+				Flag_Hou = 0;
+				Flag_Left = 0;
+				Flag_Right= 0;
+				line_velocity = 0;
+				turn_velocity = 0;
+				PKG_DEBUG("CMD_SET_BRAKE\r\n", param[0]);
 				break;
 			default:
 				PKG_DEBUG("invalid cmd!\r\n");
@@ -129,31 +138,34 @@ int packet_handle(uart_pkt_s *pkt)
 		switch(reg){
 			case CMD_GET_SYS_INFO:		/*system info*/
 				/* fill packet */
-				pkts->params[0] = 0x12;
-				pkts->params[1] = 0x34;
-				pkts->params[2] = 0x56;
-				pkts->params[3] = 0x78;
-				pkts->params[4] = 0x9a;
-				pkts->params[5] = 0xbc;
-				pkts->params[6] = 0xde;
-				pkts->len = 7;
+				pkts->params[0] = (Voltage)&0xFF;	//µç³ØµçÑ¹
+				pkts->params[1] = (Voltage&0xFF00)>>8;
+				pkts->params[2] = (Voltage&0xFF0000)>>16;
+				pkts->params[3] = (Voltage&0xFF000000)>>24;
+				
+				tmp = Angle_Balance*100;	//½Ç¶È·Å´ó100±¶			
+				pkts->params[4] = (tmp&0xFF);
+				pkts->params[5] = (tmp&0xFF00)>>8;;
+				pkts->params[6] = (tmp&0xFF0000)>>16;
+				pkts->params[7] = (tmp&0xFF000000)>>24;
+				
+				pkts->params[8] = (Distance)&0xFF;	//³¬Éù²¨¾àÀë
+				pkts->params[9] = (Distance&0xFF00)>>8;
+				pkts->params[10] = (Distance&0xFF0000)>>16;
+				pkts->params[11] = (Distance&0xFF000000)>>24;
+
+				pkts->params[12] = (Encoder_Left)&0xFF;	//×óµç»ú±àÂëÆ÷
+				pkts->params[13] = (Encoder_Left&0xFF00)>>8;
+				pkts->params[14] = (Encoder_Left&0xFF0000)>>16;
+				pkts->params[15] = (Encoder_Left&0xFF000000)>>24;
+
+				pkts->params[16] = (Encoder_Right)&0xFF;	//ÓÒµç»ú±àÂëÆ÷
+				pkts->params[17] = (Encoder_Right&0xFF00)>>8;
+				pkts->params[18] = (Encoder_Right&0xFF0000)>>16;
+				pkts->params[19] = (Encoder_Right&0xFF000000)>>24;
+				
+				pkts->len = SYS_INFO_DATA_LEN;
 				PKG_DEBUG("CMD_GET_SYS_INFO\r\n");
-				break;
-			case CMD_GET_MOTOR_DIR:		/* motor direction */
-				pkts->params[0] = left_dir;
-				pkts->params[1] = right_dir;
-				pkts->len = 2;
-				PKG_DEBUG("CMD_GET_MOTOR_DIR : param[0]=0x%x, param[1]=0x%x\r\n", 
-						param[0], param[1]);
-				break;
-			case CMD_GET_MOTOR_SPEED:	/* motor speed */
-				pkts->params[0] = pwm.pwm1&0xFF;
-				pkts->params[1] = (pwm.pwm1&0xFF00)>>8;
-				pkts->params[2] = pwm.pwm2&0xFF;
-				pkts->params[3] = (pwm.pwm2&0xFF00)>>8;
-				pkts->len = 4;
-				PKG_DEBUG("CMD_GET_MOTOR_SPEED : param[0]=0x%x, param[1]=0x%x, param[2]=0x%x, param[3]=0x%x\r\n",
-						param[0], param[1], param[2], param[3]);
 				break;
 			default:
 				PKG_DEBUG("invalid cmd!\r\n");

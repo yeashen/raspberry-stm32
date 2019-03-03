@@ -1,9 +1,4 @@
-/*
- $License:
-    Copyright (C) 2011-2012 InvenSense Corporation, All Rights Reserved.
-    See included License.txt for License information.
- $
- */
+
 /**
  *  @addtogroup  DRIVERS Sensor Driver Layer
  *  @brief       Hardware drivers to communicate with sensors via I2C.
@@ -14,19 +9,11 @@
  *      @details    All functions are preceded by the dmp_ prefix to
  *                  differentiate among MPL and general driver function calls.
  */
-//#include "stm32f10x.h"
-//#include <stdio.h>
-//#include <stdint.h>
-//#include <stdlib.h>
+#include "sys.h"
 #include <string.h>
 #include <math.h>
-#include "inv_mpu.h"
-#include "inv_mpu_dmp_motion_driver.h"
-#include "dmpKey.h"
-#include "dmpmap.h"
-#include "delay.h"
-#include "usart.h"
 
+#define  MOTION_DRIVER_TARGET_MSP430
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
  *      unsigned char length, unsigned char const *data)
@@ -40,8 +27,8 @@
 //#include "msp430_clock.h"
 #define delay_ms    delay_ms
 #define get_ms      get_ms
-#define log_i(...)     do {} while (0)
-#define log_e(...)     do {} while (0)
+#define log_e    printf
+#define log_i    printf
 
 #elif defined EMPL_TARGET_MSP430
 #include "msp430.h"
@@ -496,8 +483,8 @@ struct dmp_s {
 //    .packet_length = 0
 //};
 static struct dmp_s dmp={
-  NULL,
-  NULL,
+  0,
+  0,
   0,
   0,
   0,
@@ -1268,17 +1255,11 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
 {
     unsigned char fifo_data[MAX_PACKET_LENGTH];
     unsigned char ii = 0;
-
-    /* TODO: sensors[0] only changes when dmp_enable_feature is called. We can
-     * cache this value and save some cycles.
-     */
     sensors[0] = 0;
 
     /* Get a packet. */
-    if (mpu_read_fifo_stream(dmp.packet_length, fifo_data, more)){
-		//printf("mpu_read_fifo_stream fail!\r\n");
+    if (mpu_read_fifo_stream(dmp.packet_length, fifo_data, more))
         return -1;
-    }
 
     /* Parse DMP packet. */
     if (dmp.feature_mask & (DMP_FEATURE_LP_QUAT | DMP_FEATURE_6X_LP_QUAT)) {
@@ -1342,7 +1323,7 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
     if (dmp.feature_mask & (DMP_FEATURE_TAP | DMP_FEATURE_ANDROID_ORIENT))
         decode_gesture(fifo_data + ii);
 
-    //get_ms(timestamp);
+    myget_ms(timestamp);
     return 0;
 }
 
