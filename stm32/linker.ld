@@ -114,6 +114,7 @@ SECTIONS {
 		*(.ram.b)
 		. = ALIGN(4);
 		_ebss = . ; /* exported for the startup function */
+		end = .;
 		_end = .;
 		__end = .;
 	} >RAM AT>FLASH
